@@ -58,5 +58,5 @@ library
 
 source-repository head
     type:     git
-    location: http://github.com/tomahawkins/atom.git
+    location: git://github.com/tomahawkins/atom.git
 
