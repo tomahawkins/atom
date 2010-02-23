@@ -57,5 +57,6 @@ library
     ghc-options:       -W
 
 source-repository head
-    type:     darcs
-    location: http://patch-tag.com/r/tomahawkins/atom/pullrepo
+    type:     git
+    location: http://github.com/tomahawkins/atom.git
+
