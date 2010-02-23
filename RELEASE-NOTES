@@ -1,0 +1,89 @@
+atom 1.0.1    ???
+
+- Fixed debounce bug.
+
+atom 1.0.0    02/13/2010
+
+- Set C99 types (stdbool.h, stdint.h).  Removed cType from code configuration.
+- Removed (void) argument in generated functions.
+- Moved variables and arrays into a single hierarchical structure to provide direct access to Atom state variables from C code.
+- Pulled var' and friends (bool', word8', int64', etc.) out of the Atom monad.
+- Pulled Unit.random out of the Atom monad.
+- Unit.runTests returns exit codes 1 for YELLOW light and 2 for RED LIGHT.
+- Added cStateName code configuration for naming state structure.  Defaults to "state".
+- Generates header file to declare primary function and state structure.
+
+atom 0.1.4    12/16/2009
+
+- Added 'call' function. 
+- Bug fix to float and double variable initialization.
+- Moved Language.Atom.Verification to new project: afv.
+
+atom 0.1.3    12/03/2009
+
+- Added linear lookup (Common). 
+- Assertions and coverage points are checked between the execution of every rule, not just once per cycle.
+- Removed cCover code configuration.  Assertions and coverage are enabled by cAssert.
+
+atom 0.1.2    11/25/2009
+
+- Added div0_ and mod0_ functions, that instrument runtime checks for divide-by-zero (Lee Pike).
+- Added a phase function that specifies the earliest phase into a period a rule should execute (Lee Pike). 
+- New scheduling algorithm to balance when rules fire across the period.
+- Added support for Bits.rotate.
+- Added check for empty design.
+
+atom 0.1.1    09/29/2009
+
+- Added ULL C constant annotations for rule scheduling.
+- Created new Schedule type.
+- compile returns schedule and coverage information.
+- reportSchedule function to report scheduling information.
+- Replaced global 64-bit clock used in scheduling with local clocks.
+- Created unit testing framework.
+- Added startTimerIf.
+- Added exernal arrays (array').
+- Replaced global memory arrays with individual variables.
+
+atom 0.1.0    07/31/2009
+
+- Quieted compilation messages.
+- Added config to disable rule coverage instrumentation.
+- Added assert and cover statements.
+- Added imply to expressions.
+- Removed "int" for standard C types.
+- Added L, UL, LL, and ULL C constant annotations for 32 and 64 bit integral types.
+
+atom 0.0.5    06/03/2009
+
+- Fixed GHC seg fault issue related to Prelude.negate.
+- C config types for float and double casts (John Van Enk).
+- Improvements to docs, atom.cabal, and suggestions from hlint (Brian Lewis).
+
+atom 0.0.4    05/19/2009
+
+- Made local variables static in generated C.
+- Added checking for duplicate probe names.
+- Added hierarchical expression count report.
+- Removed dot graph for rule-variable relationships.
+- Added support for arrays.  See array, (!), and (!.).
+  WARNING: No checks for index out of bounds or overlapping assignments.
+
+atom 0.0.3    05/05/2009
+
+- Set build-depends: process >= 1.0.1.1 for readProcess
+- Traded e<n> variable names for __<n> in generated C code.
+- Made Atom a monad.  Removed use of Control.Monad.State.
+- Added Config type to configure C code generation.
+
+atom 0.0.2    04/26/2009
+
+- Disabled Yices bounded model checking.  Removed search depth compile argument.
+- Removed include, preCode, and postCode compile arguments.
+- Added external variable declations (bool', word32', etc).  Removed Cust expressions.
+- Generates dot file to display rule-variable relationships.
+- Added hooks for rule execution coverage.
+
+atom 0.0.1    04/22/2009
+
+- Initial cabal release.

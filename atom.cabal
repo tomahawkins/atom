@@ -1,0 +1,61 @@
+name:    atom
+version: 1.0.1
+
+category: Language
+
+synopsis: A DSL for embedded hard realtime applications.
+
+description:
+    Atom is a Haskell DSL for designing hard realtime embedded software.
+    Based on guarded atomic actions (similar to STM), Atom enables
+    highly concurrent programming without the need for mutex locking.
+
+    In addition, Atom performs compile-time task scheduling and generates code
+    with deterministic execution time and constant memory use, simplifying the
+    process of timing verification and memory consumption in hard realtime applications.
+
+    Without mutex locking and run-time task scheduling, Atom eliminates
+    the need and overhead of RTOSs for many embedded applications.
+
+author:     Tom Hawkins <tomahawkins@gmail.com>
+maintainer: Tom Hawkins <tomahawkins@gmail.com>
+
+license:      BSD3
+license-file: LICENSE
+
+homepage: http://tomahawkins.org
+
+build-type:    Simple
+cabal-version: >= 1.6
+
+extra-source-files:
+  RELEASE-NOTES
+
+library
+    build-depends:
+        base       >= 4.2     && < 5,
+        mtl        >= 1.1.0.1 && < 1.2,
+        process    >= 1.0.1.1 && < 1.2
+
+    exposed-modules:
+        Language.Atom
+        Language.Atom.Analysis
+        Language.Atom.Code
+        Language.Atom.Common
+        Language.Atom.Compile
+        Language.Atom.Elaboration
+        Language.Atom.Example
+        Language.Atom.Expressions
+        Language.Atom.Language
+        Language.Atom.Scheduling
+        Language.Atom.Unit
+
+    extensions: GADTs
+
+    if impl(ghc > 6.8)
+          ghc-options: -fwarn-tabs
+    ghc-options:       -W
+
+source-repository head
+    type:     darcs
+    location: http://patch-tag.com/r/tomahawkins/atom/pullrepo
