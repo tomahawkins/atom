@@ -1,6 +1,7 @@
-atom 1.0.1    ???
+atom 1.0.1    03/17/2010
 
 - Fixed debounce bug.
+- Fixed Unit -I bug, change state name to test name.
 
 atom 1.0.0    02/13/2010
 

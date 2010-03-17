@@ -92,8 +92,8 @@ runTest seed test = do
   test <- test
   putStrLn $ "running test " ++ name test ++ " ..."
   hFlush stdout
-  (_, _, _, coverageNames, _) <- compile "atom_unit_test" defaults { cCode = prePostCode test, cRuleCoverage = False } $ testbench test
-  (exit, out, err) <- readProcessWithExitCode "gcc" (["-Wall", "-g", "-o", "atom_unit_test"] ++ [ "-i" ++ i | i <- includes test ] ++ modules test ++ ["atom_unit_test.c"]) ""
+  (_, _, _, coverageNames, _) <- compile "atom_unit_test" defaults { cStateName = name test, cCode = prePostCode test, cRuleCoverage = False } $ testbench test
+  (exit, out, err) <- readProcessWithExitCode "gcc" (["-Wall", "-g", "-o", "atom_unit_test"] ++ [ "-I" ++ i | i <- includes test ] ++ modules test ++ ["atom_unit_test.c"]) ""
   let file = name test ++ ".log"
   case exit of 
     ExitFailure _ -> do
