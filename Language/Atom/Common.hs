@@ -96,7 +96,7 @@ lookupTable table x = mux (x >=. x1) y1 $ foldl f y0 table'
 linear :: FloatingE a => (E a, E a) -> (E a, E a) -> E a -> E a
 linear (x1, y1) (x2, y2) a = slope * a + inter
   where
-  slope = y2 - y1 / x2 - x1
+  slope = (y2 - y1) / (x2 - x1)
   inter = y1 - slope * x1
 
 -- | Hysteresis returns 'True' when the input exceeds @max@ and 'False' when

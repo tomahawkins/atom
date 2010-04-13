@@ -1,3 +1,7 @@
+atom 1.0.2    04/13/2010
+
+- Fixed linear bug.
+
 atom 1.0.1    03/17/2010
 
 - Fixed debounce bug.
