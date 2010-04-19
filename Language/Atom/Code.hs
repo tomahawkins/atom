@@ -166,7 +166,7 @@ declState define a = (if define then "" else "extern ") ++ init (init (f1 "" a))
   f2 i a = case a of
     StateHierarchy name items -> i ++ "{  /* " ++ name ++ " */\n" ++ intercalate ",\n" (map (f2 ("  " ++ i)) items) ++ "\n" ++ i ++ "}"
     StateVariable  name c     -> i ++ "/* " ++ name ++ " */  " ++ showConst c
-    StateArray     name c     -> i ++ "/* " ++ name ++ " */  {" ++ intercalate ", " (map showConst c) ++ "}"
+    StateArray     name c     -> i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ " ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
 
 codeRule :: Config -> Rule -> String
 codeRule config rule@(Rule _ _ _ _ _ _ _) =

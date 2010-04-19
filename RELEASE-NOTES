@@ -1,3 +1,7 @@
+atom 1.0.3    04/19/2010
+
+- Reduced line length in C code generation.
+
 atom 1.0.2    04/13/2010
 
 - Fixed linear bug.
