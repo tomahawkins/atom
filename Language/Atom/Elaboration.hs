@@ -10,6 +10,7 @@ module Language.Atom.Elaboration
   -- * Type Aliases and Utilities
   , UID
   , Name
+  , Phase (..)
   , Path
   , elaborate
   , var
@@ -36,6 +37,9 @@ type Name = String
 -- | A hierarchical name.
 type Path = [Name]
 
+-- | A phase is either the minimum phase or the exact phase.
+data Phase = MinPhase Int | ExactPhase Int
+
 data Global = Global
   { gRuleId  :: Int
   , gVarId   :: Int
@@ -43,7 +47,7 @@ data Global = Global
   , gState   :: [StateHierarchy]
   , gProbes  :: [(String, UE)]
   , gPeriod  :: Int
-  , gPhase   :: Int
+  , gPhase   :: Phase
   }
 
 data AtomDB = AtomDB
@@ -53,7 +57,7 @@ data AtomDB = AtomDB
   , atomEnable      :: UE          -- Enabling condition.
   , atomSubs        :: [AtomDB]    -- Sub atoms.
   , atomPeriod      :: Int
-  , atomPhase       :: Int
+  , atomPhase       :: Phase
   , atomAssigns     :: [(UV, UE)]
   , atomActions     :: [([String] -> String, [UE])]
   , atomAsserts     :: [(Name, UE)]
@@ -68,7 +72,7 @@ data Rule
     , ruleAssigns   :: [(UV, UE)]
     , ruleActions   :: [([String] -> String, [UE])]
     , rulePeriod    :: Int
-    , rulePhase     :: Int
+    , rulePhase     :: Phase
     }
   | Assert
     { ruleName      :: Name
@@ -171,7 +175,7 @@ put s = Atom (\ _ -> return ((), s))
 -- | Given a top level name and design, elaborates design and returns a design database.
 elaborate :: Name -> Atom () -> IO (Maybe (StateHierarchy, [Rule], [Name], [Name], [(Name, Type)]))
 elaborate name atom = do
-  (_, (g, atomDB)) <- buildAtom Global { gRuleId = 0, gVarId = 0, gArrayId = 0, gState = [], gProbes = [], gPeriod = 1, gPhase  = 0 } name atom
+  (_, (g, atomDB)) <- buildAtom Global { gRuleId = 0, gVarId = 0, gArrayId = 0, gState = [], gProbes = [], gPeriod = 1, gPhase  = MinPhase 0 } name atom
   let rules = reIdRules 0 $ elaborateRules (ubool True) atomDB
       coverageNames  = [ name | Cover  name _ _ <- rules ]
       assertionNames = [ name | Assert name _ _ <- rules ]

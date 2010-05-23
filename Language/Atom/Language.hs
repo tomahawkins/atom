@@ -9,6 +9,7 @@ module Language.Atom.Language
   , period
   , getPeriod
   , phase
+  , exactPhase
   , getPhase
   -- * Action Directives
   , cond
@@ -104,25 +105,43 @@ getPeriod = do
   (g, _) <- get
   return $ gPeriod g
 
--- | Defines the earliest phase within the period at which the rule should
--- execute.  The 'phase' must be at least zero and less than the current 'period'.
-phase :: Int -> Atom a -> Atom a
-phase n _ | n < 0 = error "ERROR: phase must be at least 0."
-phase n atom = do
+phase' :: (Int -> Phase) -> Int -> Atom a -> Atom a
+phase' _ n _ | n < 0 = error $ "ERROR: phase " ++ show n ++ " must be at least 0."
+phase' phType n atom = do
   (g, a) <- get
   if (n >= gPeriod g) 
-    then error "ERROR: phase must be less than the current phase."
-    else do put (g { gPhase = n }, a)
+    then error $ "ERROR: phase " ++ show n ++ " must be less than the current period "
+               ++ show (gPeriod g) ++ "."
+    else do put (g { gPhase = phType n }, a)
             r <- atom
             (g', a) <- get
             put (g' { gPhase = gPhase g }, a)
             return r
+    -- XXX
+    -- else do put (g { gPhase = n }, a)
+    --         r <- atom
+    --         (g', a) <- get
+    --         put (g' { gPhase = gPhase g }, a)
+    --         return r
+
+-- | Defines the earliest phase within the period at which the rule should
+-- execute; the scheduler attempt to find an optimal phase from 0 <= @n@ <
+-- period (thus, the 'phase' must be at least zero and less than the current
+-- 'period'.).
+phase :: Int -> Atom a -> Atom a
+phase n a = phase' MinPhase n a
+
+-- | Ensures an atom is scheduled only at phase @n@.
+exactPhase :: Int -> Atom a -> Atom a
+exactPhase n a = phase' ExactPhase n a
 
 -- | Returns the phase of the current scope.
 getPhase :: Atom Int
 getPhase = do
   (g, _) <- get
-  return $ gPhase g
+  return $ case gPhase g of
+             MinPhase ph   -> ph
+             ExactPhase ph -> ph
 
 -- | Returns the current atom hierarchical path.
 path :: Atom String

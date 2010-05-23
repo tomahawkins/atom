@@ -17,7 +17,8 @@ schedule rules' = concatMap spread periods
   where
   rules = [ r | r@(Rule _ _ _ _ _ _ _) <- rules' ]
 
-  -- Algorithm for assigning rules to phases for a given period:
+  -- Algorithm for assigning rules to phases for a given period 
+  -- (assuming they aren't given an exact phase):
 
     -- 1. List the rules by their offsets, highest first.
 
@@ -43,26 +44,40 @@ schedule rules' = concatMap spread periods
     
   spread :: (Int, [Rule]) -> Schedule
   spread (period, rules) = 
-    placeRules (replicate period []) orderedByPhase 
-
+    placeRules (placeExactRules (replicate period []) exactRules)
+               orderedByPhase
     where
-    orderedByPhase :: [Rule]
-    orderedByPhase = 
-        sortBy (\r0 r1 -> compare (rulePhase r1) (rulePhase r0)) rules
+    (minRules,exactRules) = partition (\r -> case rulePhase r of
+                                               MinPhase _   -> True
+                                               ExactPhase _ -> False) rules
+    placeExactRules :: [[Rule]] -> [Rule] -> [[Rule]]
+    placeExactRules ls [] = ls
+    placeExactRules ls (r:rst) = placeExactRules (insertAt (getPh r) r ls)
+                                 rst
 
+    orderedByPhase :: [Rule]
+    orderedByPhase = sortBy (\r0 r1 -> compare (getPh r1) (getPh r0)) minRules
+    getPh r = case rulePhase r of
+                MinPhase i   -> i
+                ExactPhase i -> i
+
+    -- Initially, ls contains all the exactPhase rules.  We put rules in those
+    -- lists according to the algorithm, and then filter out the phase-lists
+    -- with no rules.
     placeRules :: [[Rule]] -> [Rule] -> [(Int, Int, [Rule])]
-    placeRules ls [] = 
-      filter (\(_,_,rls) -> not (null rls)) $ zip3 (repeat period) [0..(period-1)] ls
+    placeRules ls [] = filter (\(_,_,rls) -> not (null rls)) 
+                              (zip3 (repeat period) [0..(period-1)] ls)
     placeRules ls (r:rst) = placeRules (insertAt (lub r ls) r ls) rst 
 
     lub :: Rule -> [[Rule]] -> Int
-    lub r ls = let minI = rulePhase r
+    lub r ls = let minI = getPh r
                    lub' i [] = i -- unreachable.  Included to prevent missing
                                  -- cases ghc warnings.
                    lub' i ls | (head ls) == minimum ls = i
                              | otherwise = lub' (i+1) (tail ls)
                in  lub' minI (drop minI $ map length ls)
 
+    -- Cons rule r onto the list at index i in ls.
     insertAt :: Int -> Rule -> [[Rule]] -> [[Rule]]
     insertAt i r ls = (take i ls) ++ ((r:(ls !! i)):(drop (i+1) ls))
 

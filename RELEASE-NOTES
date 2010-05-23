@@ -1,3 +1,7 @@
+atom 1.0.4    05/23/2010
+
+- Added 'exactPhase'.  (Lee Pike)
+
 atom 1.0.3    04/19/2010
 
 - Reduced line length in C code generation.
