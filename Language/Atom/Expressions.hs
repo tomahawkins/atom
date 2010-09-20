@@ -99,7 +99,7 @@ data Type
   | Word64
   | Float
   | Double
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Read, Eq, Ord, Enum)
 
 data Const
   = CBool   Bool

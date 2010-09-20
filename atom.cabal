@@ -1,5 +1,5 @@
 name:    atom
-version: 1.0.4
+version: 1.0.5
 
 category: Language
 
@@ -33,7 +33,7 @@ extra-source-files:
 
 library
     build-depends:
-        base       >= 4.2     && < 5,
+        base       >= 4.0     && < 5,
         mtl        >= 1.1.0.1 && < 1.2,
         process    >= 1.0.1.1 && < 1.2
 
