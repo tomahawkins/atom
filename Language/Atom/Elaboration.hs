@@ -27,6 +27,7 @@ module Language.Atom.Elaboration
 import Control.Monad.Trans
 import Data.Function (on)
 import Data.List
+import Data.Char
 import Language.Atom.Expressions
 
 type UID = Int
@@ -273,11 +274,21 @@ array' name t = A $ UAExtern  name t
 addName :: Name -> Atom Name
 addName name = do
   (g, atom) <- get
+  checkName name
   if elem name (atomNames atom)
     then error $ "ERROR: Name \"" ++ name ++ "\" not unique in " ++ show atom ++ "."
     else do
       put (g, atom { atomNames = name : atomNames atom })
       return $ atomName atom ++ "." ++ name
+
+-- still accepts some misformed names
+checkName :: Name -> Atom ()
+checkName name =
+  if (\ x -> isAlpha x || x == '_') (head name) && 
+      and (map (\ x -> isAlphaNum x || x `elem` "._-[]") (tail name)) && 
+      and (map isAscii name)
+    then return ()
+    else error $ "ERROR: Name \"" ++ name ++ "\" is not a valid identifier."
 
 {-
 ruleGraph :: Name -> [Rule] -> [UV] -> IO ()
