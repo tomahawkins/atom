@@ -1,3 +1,11 @@
+atom 1.0.6    09/20/2010
+
+- Support for math.h expressions
+
+atom 1.0.5    09/20/2010
+
+- Deriving Enum for Type
+
 atom 1.0.4    05/23/2010
 
 - Added 'exactPhase'.  (Lee Pike)
