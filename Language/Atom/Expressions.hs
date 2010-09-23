@@ -525,7 +525,8 @@ instance (OrdE a, NumE a, Num a, Fractional a) => Fractional (E a) where
   recip a = 1 / a
   fromRational r = Const $ fromInteger (numerator r) / fromInteger (denominator r)
 
-{-
+-- make typed Atom expressions an instance of Floating
+-- to generate calls to functions in math.h
 instance (Num a, Fractional a, Floating a, FloatingE a) => Floating (E a) where
   pi       = Const pi
   exp      (Const a) = Const $ exp a
@@ -548,7 +549,6 @@ instance (Num a, Fractional a, Floating a, FloatingE a) => Floating (E a) where
   asinh    a         = log (a + sqrt (a ** 2 + 1))
   acosh    a         = log (a + sqrt (a ** 2 - 1))
   atanh    a         = 0.5 * log ((1 + a) / (1 - a))
--}
 
 instance (Expr a, OrdE a, EqE a, IntegralE a, Bits a) => Bits (E a) where
   (Const a) .&. (Const b) = Const $ a .&. b
