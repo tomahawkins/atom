@@ -18,7 +18,7 @@ description:
     the need and overhead of RTOSs for many embedded applications.
 
 author:     Tom Hawkins <tomahawkins@gmail.com>
-maintainer: Tom Hawkins <tomahawkins@gmail.com>
+maintainer: Tom Hawkins <tomahawkins@gmail.com>, Lee Pike <leepike@gmail.com>
 
 license:      BSD3
 license-file: LICENSE
