@@ -35,7 +35,9 @@ library
     build-depends:
         base       >= 4.0     && < 5,
         mtl        >= 1.1.0.1 && < 1.2,
-        process    >= 1.0.1.1 && < 1.2
+        process    >= 1.0.1.1 && < 1.2,
+        syb        >= 0.1.0.0 && < 0.2.0.0,
+        uniplate   >= 1.5.0   && < 2.0
 
     exposed-modules:
         Language.Atom
@@ -50,7 +52,7 @@ library
         Language.Atom.Scheduling
         Language.Atom.Unit
 
-    extensions: GADTs
+    extensions: GADTs, DeriveDataTypeable
 
     if impl(ghc > 6.8)
           ghc-options: -fwarn-tabs

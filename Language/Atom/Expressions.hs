@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, DeriveDataTypeable #-}
 
 module Language.Atom.Expressions
   (
@@ -79,6 +79,8 @@ import Data.List
 import Data.Ratio
 import Data.Word
 
+import Data.Generics hiding ( typeOf )
+
 --infixl 7 /., %.
 --infixl 6 +., -.
 --infixr 5 ++.
@@ -101,7 +103,7 @@ data Type
   | Word64
   | Float
   | Double
-  deriving (Show, Read, Eq, Ord, Enum)
+  deriving (Show, Read, Eq, Ord, Enum, Data, Typeable)
 
 data Const
   = CBool   Bool
@@ -115,7 +117,7 @@ data Const
   | CWord64 Word64
   | CFloat  Float
   | CDouble Double
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data, Typeable)
 
 instance Show Const where
   show c = case c of
@@ -167,7 +169,7 @@ data UV
   = UV Int String Const
   | UVArray UA UE
   | UVExtern String Type
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data, Typeable)
 
 -- | A typed array.
 data A a = A UA deriving Eq
@@ -176,7 +178,7 @@ data A a = A UA deriving Eq
 data UA
   = UA Int String [Const]
   | UAExtern String Type
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Data, Typeable)
 
 -- | A typed expression.
 data E a where
@@ -202,6 +204,22 @@ data E a where
   B2F     :: E Word32 -> E Float
   B2D     :: E Word64 -> E Double
   Retype  :: UE -> E a
+-- math.h:
+  Pi      :: FloatingE a => E a
+  Exp     :: FloatingE a => E a -> E a
+  Log     :: FloatingE a => E a -> E a
+  Sqrt    :: FloatingE a => E a -> E a
+  Pow     :: FloatingE a => E a -> E a -> E a
+  Sin     :: FloatingE a => E a -> E a
+  Asin    :: FloatingE a => E a -> E a
+  Cos     :: FloatingE a => E a -> E a
+  Acos    :: FloatingE a => E a -> E a
+  Sinh    :: FloatingE a => E a -> E a
+  Cosh    :: FloatingE a => E a -> E a
+  Asinh   :: FloatingE a => E a -> E a
+  Acosh   :: FloatingE a => E a -> E a
+  Atan    :: FloatingE a => E a -> E a
+  Atanh   :: FloatingE a => E a -> E a
 
 instance Show (E a) where
   show _ = error "Show (E a) not implemented"
@@ -232,7 +250,23 @@ data UE
   | UD2B   UE
   | UB2F   UE
   | UB2D   UE
-  deriving (Show, Eq, Ord)
+-- math.h:
+  | UPi
+  | UExp   UE
+  | ULog   UE
+  | USqrt  UE
+  | UPow   UE UE
+  | USin   UE
+  | UAsin  UE
+  | UCos   UE
+  | UAcos  UE
+  | USinh  UE
+  | UCosh  UE
+  | UAsinh UE
+  | UAcosh UE
+  | UAtan  UE
+  | UAtanh UE
+  deriving (Show, Eq, Ord, Data, Typeable)
 
 class Width a where
   width :: a -> Int
@@ -316,6 +350,22 @@ instance TypeOf UE where
     UD2B _     -> Word64
     UB2F _     -> Float
     UB2D _     -> Double
+-- math.h:
+    UPi        -> Double
+    UExp   a   -> typeOf a
+    ULog   a   -> typeOf a
+    USqrt  a   -> typeOf a
+    UPow   a _ -> typeOf a
+    USin   a   -> typeOf a
+    UAsin  a   -> typeOf a
+    UCos   a   -> typeOf a
+    UAcos  a   -> typeOf a
+    USinh  a   -> typeOf a
+    UCosh  a   -> typeOf a
+    UAsinh a   -> typeOf a
+    UAcosh a   -> typeOf a
+    UAtan  a   -> typeOf a
+    UAtanh a   -> typeOf a
 
 instance Expr a => TypeOf (E a) where
   typeOf = eType
@@ -686,6 +736,22 @@ ueUpstream t = case t of
   UD2B a      -> [a]
   UB2F a      -> [a]
   UB2D a      -> [a]
+-- math.h:
+  UPi         -> []
+  UExp   a    -> [a]
+  ULog   a    -> [a]
+  USqrt  a    -> [a]
+  UPow   a b  -> [a, b]
+  USin   a    -> [a]
+  UAsin  a    -> [a]
+  UCos   a    -> [a]
+  UAcos  a    -> [a]
+  USinh  a    -> [a]
+  UCosh  a    -> [a]
+  UAsinh a    -> [a]
+  UAcosh a    -> [a]
+  UAtan  a    -> [a]
+  UAtanh a    -> [a]
 
 -- | The list of all UVs that directly control the value of an expression.
 nearestUVs :: UE -> [UV]
@@ -729,6 +795,23 @@ ue t = case t of
   B2F    a     -> UB2F     (ue a)
   B2D    a     -> UB2D     (ue a)
   Retype a     -> a
+-- math.h:
+  Pi           -> UPi
+  Exp    a     -> UExp   (ue a)
+  Log    a     -> ULog   (ue a)
+  Sqrt   a     -> USqrt  (ue a)
+  Pow    a b   -> UPow   (ue a) (ue b)
+  Sin    a     -> USin   (ue a)
+  Asin   a     -> UAsin  (ue a)
+  Cos    a     -> UCos   (ue a)
+  Acos   a     -> UAcos  (ue a)
+  Sinh   a     -> USinh  (ue a)
+  Cosh   a     -> UCosh  (ue a)
+  Asinh  a     -> UAsinh (ue a)
+  Acosh  a     -> UAcosh (ue a)
+  Atan   a     -> UAtan  (ue a)
+  Atanh  a     -> UAtanh (ue a)
+
   where
   tt = eType t
 

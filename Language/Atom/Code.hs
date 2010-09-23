@@ -11,6 +11,8 @@ import Data.List
 import Data.Maybe
 import Text.Printf
 
+import Data.Generics.Uniplate.Data
+
 import Language.Atom.Analysis
 import Language.Atom.Elaboration
 import Language.Atom.Expressions
@@ -100,13 +102,54 @@ codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ bas
     UD2B _               -> ["*((", ct Word64, " *) &(", a, "))"]
     UB2F _               -> ["*((", ct Float , " *) &(", a, "))"]
     UB2D _               -> ["*((", ct Double, " *) &(", a, "))"]
+-- math.h:
+    UPi                  -> [ "M_PI" ]
+    UExp   _             -> [ "exp",   f, " ( ", a, " )"]
+    ULog   _             -> [ "log",   f, " ( ", a, " )"]
+    USqrt  _             -> [ "sqrt",  f, " ( ", a, " )"]
+    UPow   _ _           -> [ "pow",   f, " ( ", a, ", ", b, " )"]
+    USin   _             -> [ "sin",   f, " ( ", a, " )"]
+    UAsin  _             -> [ "asin",  f, " ( ", a, " )"]
+    UCos   _             -> [ "cos",   f, " ( ", a, " )"]
+    UAcos  _             -> [ "acos",  f, " ( ", a, " )"]
+    USinh  _             -> [ "sinh",  f, " ( ", a, " )"]
+    UCosh  _             -> [ "cosh",  f, " ( ", a, " )"]
+    UAsinh _             -> [ "asinh", f, " ( ", a, " )"]
+    UAcosh _             -> [ "acosh", f, " ( ", a, " )"]
+    UAtan  _             -> [ "atan",  f, " ( ", a, " )"]
+    UAtanh _             -> [ "atanh", f, " ( ", a, " )"]
     where
     ct = cType
     a = head operands
     b = operands !! 1
     c = operands !! 2
+    f = case ( typeOf ue ) of
+          Float     -> "f"
+          Double    -> ""
+          _         -> error "unhandled float type"
+
 
 type RuleCoverage = [(Name, Int, Int)]
+
+containMathHFunctions rules = any isMathHCall ues
+       where ues            = rules >>= allUEs >>= universe
+             isMathHCall fc = case fc of
+                                UPi        -> True
+                                UExp   _   -> True
+                                ULog   _   -> True
+                                USqrt  _   -> True
+                                UPow   _ _ -> True
+                                USin   _   -> True
+                                UAsin  _   -> True
+                                UCos   _   -> True
+                                UAcos  _   -> True
+                                USinh  _   -> True
+                                UCosh  _   -> True
+                                UAsinh _   -> True
+                                UAcosh _   -> True
+                                UAtan  _   -> True
+                                UAtanh _   -> True
+                                _          -> False
 
 writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] -> [Name] -> [(Name, Type)] -> IO RuleCoverage
 writeC name config state rules schedule assertionNames coverageNames probeNames = do
@@ -118,6 +161,7 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
   c = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
+    , codeIf ( containMathHFunctions rules ) "#include <math.h>"
     , ""
     , preCode
     , ""
