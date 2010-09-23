@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module Language.Atom.Expressions
   (
   -- * Types
