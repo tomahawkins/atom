@@ -160,7 +160,6 @@ codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ bas
     UAtan  _             -> [ "atan",  f, " ( ", a, " )"]
     UAtanh _             -> [ "atanh", f, " ( ", a, " )"]
     where
-<<<<<<< HEAD
       ct = cType
       a = head operands
       b = operands !! 1
@@ -169,17 +168,6 @@ codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ bas
             Float     -> "f"
             Double    -> ""
             _         -> error "unhandled float type"
-=======
-    ct = cType
-    a = head operands
-    b = operands !! 1
-    c = operands !! 2
-    f = case ( typeOf ue ) of
-          Float     -> "f"
-          Double    -> ""
-          _         -> error "unhandled float type"
-
->>>>>>> b6245af5efa4b29493755b6842938a8ca13a931b
 
 type RuleCoverage = [(Name, Int, Int)]
 
@@ -203,12 +191,8 @@ containMathHFunctions rules = any isMathHCall ues
                                 UAtanh _   -> True
                                 _          -> False
 
-<<<<<<< HEAD
 writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] 
        -> [Name] -> [(Name, Type)] -> IO RuleCoverage
-=======
-writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] -> [Name] -> [(Name, Type)] -> IO RuleCoverage
->>>>>>> b6245af5efa4b29493755b6842938a8ca13a931b
 writeC name config state rules schedule assertionNames coverageNames probeNames = do
   writeFile (name ++ ".c") c
   writeFile (name ++ ".h") h
