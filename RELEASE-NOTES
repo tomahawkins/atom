@@ -1,3 +1,7 @@
+atom 1.0.7    09/25/2010
+
+- Support for using a HW clock to control the duration of phases.
+
 atom 1.0.6    09/20/2010
 
 - Support for math.h expressions

@@ -1,8 +1,10 @@
 -- | Atom C code generation.
 module Language.Atom.Code
   ( Config (..)
+  , Clock (..)
   , writeC
   , defaults
+  , defaultClock
   , cType
   , RuleCoverage
   ) where
@@ -10,6 +12,7 @@ module Language.Atom.Code
 import Data.List
 import Data.Maybe
 import Text.Printf
+import Data.Word
 
 import Data.Generics.Uniplate.Data
 
@@ -20,13 +23,45 @@ import Language.Atom.Scheduling
 
 -- | C code configuration parameters.
 data Config = Config
-  { cFuncName     :: String                                                  -- ^ Alternative primary function name.  Leave empty to use compile name.
-  , cStateName    :: String                                                  -- ^ Name of state variable structure.  Default: state
-  , cCode         :: [Name] -> [Name] -> [(Name, Type)] -> (String, String)  -- ^ Custom C code to insert above and below, given assertion names, coverage names, and probe names and types.
-  , cRuleCoverage :: Bool                                                    -- ^ Enable rule coverage tracking.
-  , cAssert       :: Bool                                                    -- ^ Enable assertions and functional coverage.
-  , cAssertName   :: String                                                  -- ^ Name of assertion function.  Type: void assert(int, bool, uint64_t);
-  , cCoverName    :: String                                                  -- ^ Name of coverage function.  Type: void cover(int, bool, uint64_t);
+
+  { cFuncName     :: String -- ^ Alternative primary function name.  Leave empty
+                            -- to use compile name.
+  , cStateName    :: String -- ^ Name of state variable structure.  Default: state
+
+  , cCode         :: [Name] -> [Name] -> [(Name, Type)]
+                      -> (String, String)  -- ^ Custom C code to insert above
+                                           -- and below, given assertion names,
+                                           -- coverage names, and probe names
+                                           -- and types.
+  , cRuleCoverage :: Bool -- ^ Enable rule coverage tracking.
+  , cAssert       :: Bool -- ^ Enable assertions and functional coverage.
+  , cAssertName   :: String -- ^ Name of assertion function.  Type: void
+                            -- assert(int, bool, uint64_t);
+  , cCoverName    :: String -- ^ Name of coverage function.  Type: void
+                            -- cover(int, bool, uint64_t);
+  , hardwareClock :: Maybe Clock -- ^ Do we use a hardware counter to schedule
+                                 -- rules?
+  }
+
+-- | Data associated with sampling a hardware clock.
+data Clock = Clock
+
+  { clockName  :: String        -- ^ C function to sample the clock.  The
+                                -- funciton is assumed to have the prototype
+                                -- @clockType clockName(void)@.
+  , clockType  :: Type          -- ^ Clock type.  Assumed to be one of Word8,
+                                -- Word16, Word32, or Word64.  It is permissible
+                                -- for the clock to rollover.  
+  , delta      :: Integer       -- ^ Number of ticks in a phase.  Must be greater than 0.
+  , delay      :: String        -- ^ C function to delay/sleep.  The function is
+                                -- assumed to have the prototype @void
+                                -- delay(clockType i)@, where @i@ is the
+                                -- duration of delay/sleep.
+  , err        :: Maybe String  -- ^ Nothing or a user-defined error-reporting
+                                -- function if the period duration is violated;
+                                -- e.g., the execution time was greater than
+                                -- @delta@.  Assumed to have prototype @void
+                                -- err(void)@.
   }
 
 -- | Default C code configuration parameters (default function name, no pre/post code, ANSI C types).
@@ -39,7 +74,11 @@ defaults = Config
   , cAssert       = True
   , cAssertName   = "assert"
   , cCoverName    = "cover"
+  , hardwareClock = Nothing
   }
+
+defaultClock :: Clock
+defaultClock = Clock "clk" Word64 1 "delay" Nothing
 
 showConst :: Const -> String
 showConst c = case c of
@@ -119,15 +158,14 @@ codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ bas
     UAtan  _             -> [ "atan",  f, " ( ", a, " )"]
     UAtanh _             -> [ "atanh", f, " ( ", a, " )"]
     where
-    ct = cType
-    a = head operands
-    b = operands !! 1
-    c = operands !! 2
-    f = case ( typeOf ue ) of
-          Float     -> "f"
-          Double    -> ""
-          _         -> error "unhandled float type"
-
+      ct = cType
+      a = head operands
+      b = operands !! 1
+      c = operands !! 2
+      f = case ( typeOf ue ) of
+            Float     -> "f"
+            Double    -> ""
+            _         -> error "unhandled float type"
 
 type RuleCoverage = [(Name, Int, Int)]
 
@@ -151,7 +189,8 @@ containMathHFunctions rules = any isMathHCall ues
                                 UAtanh _   -> True
                                 _          -> False
 
-writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] -> [Name] -> [(Name, Type)] -> IO RuleCoverage
+writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] 
+       -> [Name] -> [(Name, Type)] -> IO RuleCoverage
 writeC name config state rules schedule assertionNames coverageNames probeNames = do
   writeFile (name ++ ".c") c
   writeFile (name ++ ".h") h
@@ -165,21 +204,96 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , ""
     , preCode
     , ""
-    , "static " ++ cType Word64 ++ " __global_clock = 0;"
-    , codeIf (cRuleCoverage config) $ "static const " ++ cType Word32 ++ " __coverage_len = " ++ show covLen ++ ";"
-    , codeIf (cRuleCoverage config) $ "static " ++ cType Word32 ++ " __coverage[" ++ show covLen ++ "] = {" ++ (concat $ intersperse ", " $ replicate covLen "0") ++ "};"
+    , "static " ++ globalType ++ " " ++ globalClk ++ " = 0;"
+    , codeIf (cRuleCoverage config) $ "static const " ++ cType Word32 
+                 ++ " __coverage_len = " ++ show covLen ++ ";"
+    , codeIf (cRuleCoverage config) $ "static " ++ cType Word32 
+                 ++ " __coverage[" ++ show covLen ++ "] = {" 
+                 ++ (concat $ intersperse ", " $ replicate covLen "0") ++ "};"
     , codeIf (cRuleCoverage config) $ "static " ++ cType Word32 ++ " __coverage_index = 0;"
     , declState True $ StateHierarchy (cStateName config) [state]
     , concatMap (codeRule config) rules'
     , codeAssertionChecks config assertionNames coverageNames rules
     , "void " ++ funcName ++ "() {"
-    , concatMap (codePeriodPhase config) schedule
-    , "  __global_clock = __global_clock + 1;"
+    , swOrHwClock
     , "}"
     , ""
     , postCode
     ]
 
+  codePeriodPhases = concatMap (codePeriodPhase config) schedule
+
+  swOrHwClock = 
+    case hardwareClock config of
+      Nothing      -> unlines [codePeriodPhases, "  " ++ globalClk ++ " = " ++ globalClk ++ " + 1;"]
+      Just clkData -> unlines 
+        [ "  " ++ setGlobalClk clkData
+        , ""
+        , codePeriodPhases
+        , "  // In the following we sample the hardware clock, waiting for the next phase."
+        , ""
+        , "  " ++ declareConst phaseConst clkDelta
+        , "  " ++ declareConst maxConst maxVal
+        , "  " ++ globalType ++ " " ++ setTime
+        , ""
+        , errCheck 
+        , "  " ++ setTime ++ " // Update the current time."
+        , "  // Wait until the phase has expired.  If the current time hasn't"
+        , "  // overflowed, execute the first branch; otherwise, the second."
+        , "  if (" ++ currentTime ++ " >= " ++ globalClk ++ ") {"
+        , "    " ++ delayFn ++ "(" ++ phaseConst ++ " - (" ++ currentTime
+                   ++ " - " ++ globalClk ++ "));" 
+        , "  }"
+        , "  else {"
+        , "    " ++ delayFn ++ "(" ++ phaseConst ++ " - (" ++ currentTime ++ " + (" 
+                 ++ maxConst ++ " - " ++ globalClk ++ ")));"
+                 
+        , "  }"
+        ]
+        where 
+          delayFn = delay clkData
+          maxVal :: Integer
+          maxVal  = 2 ^ (case clockType clkData of
+                           Word8  -> 8
+                           Word16 -> 16
+                           Word32 -> 32
+                           Word64 -> 64
+                           _      -> clkTypeErr) - 1
+          declareConst varName c = globalType ++ " const " ++ varName 
+                                   ++ " = " ++ showConst (constType c) ++ ";"
+          setTime     = currentTime ++ " = " ++ clockName clkData ++ "();"
+          maxConst    = "__max"
+          phaseConst = "__phase_len"
+          currentTime = "__curr_time"
+          clkDelta | d <= 0 || d > maxVal = 
+            error "The delta given for the number of ticks in a phase must be greater than 0."
+                   | otherwise = d
+            where d = delta clkData
+          errCheck = 
+            case err clkData of
+              Nothing    -> ""
+              Just errF  -> unlines 
+                [ "  // An error check for when the phase has already expired."
+                , "  // The first disjunct is for when the current time has not overflowed,"
+                , "  // and the second for when it has."
+                , "  if (   ((" ++ currentTime ++ " >= " ++ globalClk ++ ") && (" 
+                                ++ currentTime ++ " - " ++ globalClk 
+                                ++ " > " ++ phaseConst ++ "))" 
+                , "      || (("
+                             ++ currentTime ++ " < " ++ globalClk ++ ") && ((" ++ maxConst 
+                             ++ " - " ++ globalClk ++ ") + " ++ currentTime ++ " > " 
+                             ++ phaseConst ++ "))) {"
+                , "    " ++ errF ++ "();"
+                , "  }"
+                ]
+          constType :: Integer -> Const
+          constType c = case clockType clkData of
+                          Word8  -> CWord8  (fromInteger c :: Word8)
+                          Word16 -> CWord16 (fromInteger c :: Word16)
+                          Word32 -> CWord32 (fromInteger c :: Word32)
+                          Word64 -> CWord64 (fromInteger c :: Word64)
+                          _      -> clkTypeErr
+                                               
   h = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
@@ -189,12 +303,25 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , declState False $ StateHierarchy (cStateName config) [state]
     ]
 
+  globalType = cType (case hardwareClock config of
+                        Nothing      -> Word64 -- Default type
+                        Just clkData -> case clockType clkData of
+                                          Word8  -> Word8
+                                          Word16 -> Word16
+                                          Word32 -> Word32
+                                          Word64 -> Word64
+                                          _      -> clkTypeErr)
+
+  clkTypeErr = error "Clock type must be one of Word8, Word16, Word32, Word64."
+
   funcName = if null (cFuncName config) then name else cFuncName config
 
   rules' :: [Rule]
   rules' = concat [ r | (_, _, r) <- schedule ]
 
   covLen = 1 + div (maximum $ map ruleId rules') 32
+
+  setGlobalClk clkData = globalClk ++ " = " ++ clockName clkData ++ "();"
 
 codeIf :: Bool -> String -> String
 codeIf a b = if a then b else ""
@@ -244,12 +371,15 @@ codeRule config rule@(Rule _ _ _ _ _ _ _) =
 
 codeRule _ _ = ""
 
+globalClk :: String
+globalClk = "__global_clock"
+
 codeAssertionChecks :: Config -> [Name] -> [Name] -> [Rule] -> String
 codeAssertionChecks config assertionNames coverageNames rules = codeIf (cAssert config) $
   "static void __assertion_checks() {\n" ++
   concatMap (codeUE config ues "  ") ues ++
-  concat [ "  if (" ++ id enable ++ ") " ++ cAssertName config ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", __global_clock);\n" | Assert name enable check <- rules ] ++
-  concat [ "  if (" ++ id enable ++ ") " ++ cCoverName  config ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", __global_clock);\n" | Cover  name enable check <- rules ] ++
+  concat [ "  if (" ++ id enable ++ ") " ++ cAssertName config ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", " ++ globalClk ++ ");\n" | Assert name enable check <- rules ] ++
+  concat [ "  if (" ++ id enable ++ ") " ++ cCoverName  config ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", " ++ globalClk ++ ");\n" | Cover  name enable check <- rules ] ++
   "}\n\n"
   where
   ues = topo $ concat [ [a, b] | Assert _ a b <- rules ] ++ concat [ [a, b] | Cover _ a b <- rules ]
