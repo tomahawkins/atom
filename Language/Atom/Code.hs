@@ -16,8 +16,6 @@ import Data.Word
 
 import Data.Generics.Uniplate.Data
 
-import Data.Generics.Uniplate.Data
-
 import Language.Atom.Analysis
 import Language.Atom.Elaboration
 import Language.Atom.Expressions
@@ -45,7 +43,10 @@ data Config = Config
                                  -- rules?
   }
 
--- | Data associated with sampling a hardware clock.
+-- | Data associated with sampling a hardware clock.  For the clock to work
+-- correctly, you MUST assign @__global_clock@ the current time (accoring to 
+-- @clockName@) the first time you enter the main Atom-generated function
+-- calling your rules.
 data Clock = Clock
 
   { clockName  :: String        -- ^ C function to sample the clock.  The
@@ -229,8 +230,7 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     case hardwareClock config of
       Nothing      -> unlines [codePeriodPhases, "  " ++ globalClk ++ " = " ++ globalClk ++ " + 1;"]
       Just clkData -> unlines 
-        [ "  " ++ setGlobalClk clkData
-        , ""
+        [ ""
         , codePeriodPhases
         , "  // In the following we sample the hardware clock, waiting for the next phase."
         , ""
@@ -249,32 +249,44 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
         , "  else {"
         , "    " ++ delayFn ++ "(" ++ phaseConst ++ " - (" ++ currentTime ++ " + (" 
                  ++ maxConst ++ " - " ++ globalClk ++ ")));"
-                 
         , "  }"
+        , ""
+        , "  " ++ setGlobalClk clkData
         ]
-        where 
+        where
           delayFn = delay clkData
           maxVal :: Integer
-          maxVal  = 2 ^ (case clockType clkData of
-                           Word8  -> 8
-                           Word16 -> 16
-                           Word32 -> 32
-                           Word64 -> 64
-                           _      -> clkTypeErr) - 1
-          declareConst varName c = globalType ++ " const " ++ varName 
+          maxVal  = case clockType clkData of
+                      Word8  -> toInteger (maxBound :: Word8)
+                      Word16 -> toInteger (maxBound :: Word16)
+                      Word32 -> toInteger (maxBound :: Word32)
+                      Word64 -> toInteger (maxBound :: Word64)
+                      _      -> clkTypeErr
+          declareConst varName c = globalType ++ " const " ++ varName
                                    ++ " = " ++ showConst (constType c) ++ ";"
           setTime     = currentTime ++ " = " ++ clockName clkData ++ "();"
           maxConst    = "__max"
           phaseConst = "__phase_len"
           currentTime = "__curr_time"
-          clkDelta | d <= 0 || d > maxVal = 
-            error "The delta given for the number of ticks in a phase must be greater than 0."
-                   | otherwise = d
+          clkDelta | d <= 0
+                       = error $ "The delta "
+                                 ++ show d
+                                 ++ ", given for the number of ticks "
+                                 ++ "in a phase must be greater than 0."
+                   | d > maxVal
+                       = error $ "The delta "
+                         ++ show d
+                         ++ ", given for the number of ticks in a phase "
+                         ++ "must be smaller than "
+                         ++ show ( maxVal + 1 )
+                         ++ "."
+                   | otherwise
+                       = d
             where d = delta clkData
-          errCheck = 
+          errCheck =
             case err clkData of
               Nothing    -> ""
-              Just errF  -> unlines 
+              Just errF  -> unlines
                 [ "  // An error check for when the phase has already expired."
                 , "  // The first disjunct is for when the current time has not overflowed,"
                 , "  // and the second for when it has."
@@ -314,6 +326,7 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
                                           Word64 -> Word64
                                           _      -> clkTypeErr)
 
+  clkTypeErr :: a
   clkTypeErr = error "Clock type must be one of Word8, Word16, Word32, Word64."
 
   funcName = if null (cFuncName config) then name else cFuncName config
