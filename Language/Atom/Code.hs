@@ -14,8 +14,6 @@ import Data.Maybe
 import Text.Printf
 import Data.Word
 
-import Data.Generics.Uniplate.Data
-
 import Language.Atom.Analysis
 import Language.Atom.Elaboration
 import Language.Atom.Expressions
@@ -172,25 +170,12 @@ codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ bas
 
 type RuleCoverage = [(Name, Int, Int)]
 
-containMathHFunctions rules = any isMathHCall ues
-       where ues            = rules >>= allUEs >>= universe
-             isMathHCall fc = case fc of
-                                UPi        -> True
-                                UExp   _   -> True
-                                ULog   _   -> True
-                                USqrt  _   -> True
-                                UPow   _ _ -> True
-                                USin   _   -> True
-                                UAsin  _   -> True
-                                UCos   _   -> True
-                                UAcos  _   -> True
-                                USinh  _   -> True
-                                UCosh  _   -> True
-                                UAsinh _   -> True
-                                UAcosh _   -> True
-                                UAtan  _   -> True
-                                UAtanh _   -> True
-                                _          -> False
+containMathHFunctions :: [Rule] -> Bool
+containMathHFunctions rules = 
+  any math rules
+  where math rule = case rule of
+                      Rule _ _ _ _ _ _ _ b -> b
+                      _                    -> False
 
 writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] 
        -> [Name] -> [(Name, Type)] -> IO RuleCoverage
@@ -355,7 +340,7 @@ declState define a = (if define then "" else "extern ") ++ init (init (f1 "" a))
     StateArray     name c     -> i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ " ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
 
 codeRule :: Config -> Rule -> String
-codeRule config rule@(Rule _ _ _ _ _ _ _) =
+codeRule config rule@(Rule _ _ _ _ _ _ _ _) =
   "/* " ++ show rule ++ " */\n" ++
   "static void __r" ++ show (ruleId rule) ++ "() {\n" ++
   concatMap (codeUE config ues "  ") ues ++

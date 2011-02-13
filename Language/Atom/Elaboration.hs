@@ -74,6 +74,7 @@ data Rule
     , ruleActions   :: [([String] -> String, [UE])]
     , rulePeriod    :: Int
     , rulePhase     :: Phase
+    , mathH         :: Bool -- Contains a math.h call?
     }
   | Assert
     { ruleName      :: Name
@@ -109,6 +110,7 @@ elaborateRules parentEnable atom = if isRule then rule : rules else rules
     , ruleActions   = atomActions atom
     , rulePeriod    = atomPeriod  atom
     , rulePhase     = atomPhase   atom
+    , mathH         = any isMathHCall (allUEs rule)
     }
   assert (name, ue) = Assert
     { ruleName      = name
@@ -120,15 +122,17 @@ elaborateRules parentEnable atom = if isRule then rule : rules else rules
     , ruleEnable    = enable
     , ruleCover     = ue
     }
-  rules = map assert (atomAsserts atom) ++ map cover (atomCovers atom) ++ concatMap (elaborateRules enable) (atomSubs atom)
+  rules =    map assert (atomAsserts atom) 
+          ++ map cover (atomCovers atom) 
+          ++ concatMap (elaborateRules enable) (atomSubs atom)
   enableAssign :: (UV, UE) -> (UV, UE)
   enableAssign (uv, ue) = (uv, umux enable ue $ UVRef uv)
 
 reIdRules :: Int -> [Rule] -> [Rule]
 reIdRules _ [] = []
 reIdRules i (a:b) = case a of
-  Rule _ _ _ _ _ _ _ -> a { ruleId = i } : reIdRules (i + 1) b
-  _                  -> a                : reIdRules  i      b
+  Rule _ _ _ _ _ _ _ _ -> a { ruleId = i } : reIdRules (i + 1) b
+  _                    -> a                : reIdRules  i      b
 
 buildAtom :: Global -> Name -> Atom a -> IO (a, (Global, AtomDB))
 buildAtom g name (Atom f) = f (g { gRuleId = gRuleId g + 1 }, AtomDB
@@ -176,7 +180,14 @@ put s = Atom (\ _ -> return ((), s))
 -- | Given a top level name and design, elaborates design and returns a design database.
 elaborate :: Name -> Atom () -> IO (Maybe (StateHierarchy, [Rule], [Name], [Name], [(Name, Type)]))
 elaborate name atom = do
-  (_, (g, atomDB)) <- buildAtom Global { gRuleId = 0, gVarId = 0, gArrayId = 0, gState = [], gProbes = [], gPeriod = 1, gPhase  = MinPhase 0 } name atom
+  (_, (g, atomDB)) <- buildAtom Global { gRuleId = 0
+                                       , gVarId = 0
+                                       , gArrayId = 0
+                                       , gState = []
+                                       , gProbes = []
+                                       , gPeriod = 1
+                                       , gPhase  = MinPhase 0 
+                                       } name atom
   let rules = reIdRules 0 $ elaborateRules (ubool True) atomDB
       coverageNames  = [ name | Cover  name _ _ <- rules ]
       assertionNames = [ name | Assert name _ _ <- rules ]
@@ -188,7 +199,10 @@ elaborate name atom = do
     else do
       mapM_ checkEnable rules
       ok <- mapM checkAssignConflicts rules
-      return (if and ok then Just (trimState $ StateHierarchy name $ gState g, rules, assertionNames, coverageNames, probeNames) else Nothing)
+      return (if and ok 
+                then Just (trimState $ StateHierarchy name 
+                            $ gState g, rules, assertionNames, coverageNames, probeNames) 
+                else Nothing)
 
 trimState :: StateHierarchy -> StateHierarchy
 trimState a = case a of
@@ -206,7 +220,7 @@ checkEnable rule | ruleEnable rule == ubool False = putStrLn $ "WARNING: Rule wi
 
 -- | Check that a variable is assigned more than once in a rule.  Will eventually be replaced consistent assignment checking.
 checkAssignConflicts :: Rule -> IO Bool
-checkAssignConflicts rule@(Rule _ _ _ _ _ _ _) =
+checkAssignConflicts rule@(Rule _ _ _ _ _ _ _ _) =
   if length vars /= length vars'
     then do
       putStrLn $ "ERROR: Rule " ++ show rule ++ " contains multiple assignments to the same variable(s)."
@@ -322,7 +336,7 @@ ruleGraph name rules uvs = do
 allUVs :: [Rule] -> UE -> [UV]
 allUVs rules ue = fixedpoint next $ nearestUVs ue
   where
-  assigns = concat [ ruleAssigns r | r@(Rule _ _ _ _ _ _ _) <- rules ]
+  assigns = concat [ ruleAssigns r | r@(Rule _ _ _ _ _ _ _ _) <- rules ]
   previousUVs :: UV -> [UV]
   previousUVs uv = concat [ nearestUVs ue | (uv', ue) <- assigns, uv == uv' ]
   next :: [UV] -> [UV]
@@ -340,7 +354,9 @@ allUEs rule = ruleEnable rule : ues
   index (UVArray _ ue) = [ue]
   index _ = []
   ues = case rule of
-    Rule _ _ _ _ _ _ _ -> concat [ ue : index uv | (uv, ue) <- ruleAssigns rule ] ++ concat (snd (unzip (ruleActions rule)))
+    Rule _ _ _ _ _ _ _ _ -> 
+         concat [ ue : index uv | (uv, ue) <- ruleAssigns rule ] 
+      ++ concat (snd (unzip (ruleActions rule)))
     Assert _ _ a       -> [a]
     Cover  _ _ a       -> [a]
 
