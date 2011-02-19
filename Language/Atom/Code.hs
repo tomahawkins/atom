@@ -210,7 +210,7 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , "static " ++ globalType ++ " " ++ globalClk ++ " = 0;"
     , case hardwareClock config of
         Nothing -> ""
-        Just _  -> "static " ++ globalType ++ " " ++ phaseStartTime ++ " = 0;"
+        Just _  -> "static " ++ globalType ++ " " ++ phaseStartTime ++ ";"
     , codeIf (cRuleCoverage config) $ "static const " ++ cType Word32
                  ++ " __coverage_len = " ++ show covLen ++ ";"
     , codeIf (cRuleCoverage config) $ "static " ++ cType Word32
@@ -220,7 +220,8 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , declState True $ StateHierarchy (cStateName config) [state]
     , concatMap (codeRule config) rules'
     , codeAssertionChecks config assertionNames coverageNames rules
-    , "void " ++ funcName ++ "() {"
+    , "void " ++ funcName ++ " ()"
+    , "{"
     , unlines [ swOrHwClock
               , codePeriodPhases
               , "  " ++ globalClk ++ " = " ++ globalClk ++ " + 1;"
@@ -244,13 +245,18 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
         , "  static bool __first_call = true;"
         , "  " ++ globalType ++ " " ++ currentTime ++ ";"
         , ""
+        , "  // save the current time"
+        , "  " ++ setTime
+        , ""
+        , "  // initialize static variables on the first call"
         , "  if ( __first_call ) {"
         , "    " ++ lastPhaseStartTime ++ " = " ++ phaseStartTime ++ ";"
+        , "    " ++ lastTime ++ " = " ++ currentTime ++ ";"
         , "    __first_call = false;"
         , "  }"
         , ""
-        , "  // In the following we sample the hardware clock and wait to start the phase."
-        , "  " ++ setTime
+        , "  // wait for the amount left for the phase start time to be reached,"
+        , "  // handle roll-overs of the system timer and the phase start time"
         , "  if ( " ++ phaseStartTime ++ " >= " ++ lastPhaseStartTime ++ " ) {"
         , "    // phase start time did not roll over"
         , "    if ( " ++ currentTime ++ " >= " ++ lastTime ++ " ) {"
@@ -283,7 +289,7 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
         , "    } else {"
         , "      // current time and phase start time rolled over"
         , "      // equal to the first case"
-        , "      if ( " ++ currentTime ++ " >= " ++ phaseStartTime ++ " ) {"
+        , "      if ( " ++ phaseStartTime ++ " >= " ++ currentTime ++ " ) {"
         , "        " ++ delayFn ++ " ( " ++ phaseStartTime ++ " - " ++ currentTime ++ " );"
         , "      } else {"
         , "        // we are late"
@@ -293,10 +299,10 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
         , "  }"
         , ""
         , ""
+        , "  // update to the next phase start time"
         , "  " ++ lastPhaseStartTime ++ " = " ++ phaseStartTime ++ ";"
-        , "  // make the roll over of " ++ phaseStartTime ++ " explicit"
-        , "  " ++ phaseStartTime ++ " = ( " ++ phaseStartTime ++ " + "
-               ++ phaseConst ++ " ) % ( " ++ maxConst ++ " + 1 );"
+        , "  " ++ phaseStartTime ++ " = " ++ phaseStartTime ++ " + "
+               ++ phaseConst ++ ";"
         , "  " ++ lastTime ++ " = " ++ currentTime ++ ";"
         ]
         where
