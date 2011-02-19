@@ -269,8 +269,13 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
         , "      }"
         , "    } else {"
         , "      // system time rolled over, the start time of the"
-        , "      // phase did not, i.e. we are late"
-        , "      " ++ errHandler
+        , "      // phase did not, i.e. we are not late if currentTime"
+        , "      // is already in between lastPhaseStartTime and phaseStartTime"
+        , "      if ( ( " ++ currentTime ++ " >= " ++ lastPhaseStartTime ++ " ) "
+        , "             && ( " ++ currentTime ++ " < " ++ phaseStartTime ++ " ) )"
+        , "        " ++ delayFn ++ " ( " ++ phaseStartTime ++ " - " ++ currentTime ++ " );"
+        , "      else"
+        , "        " ++ errHandler
         , "    }"
         , "  } else {"
         , "    // phase start time rolled over"
