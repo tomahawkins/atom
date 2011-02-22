@@ -17,12 +17,12 @@ module Language.Atom.Expressions
   , Width (..)
   , TypeOf (..)
   , bytes
-  , ue
-  , uv
-  , ueUpstream
+--  , ue
+--  , uv
+--  , ueUpstream
   , isMathHCall
-  , nearestUVs
-  , arrayIndices
+--  , nearestUVs
+--  , arrayIndices
   , NumE
   , IntegralE
   , FloatingE
@@ -269,6 +269,7 @@ data UE
   | UAtanh UE
   deriving (Show, Eq, Ord, Data, Typeable)
 
+-- XXX can put this back after making UE map---won't be expensive.
 isMathHCall :: UE -> Bool
 isMathHCall fc = 
   case fc of
@@ -729,67 +730,6 @@ mux = Mux
 (!.) :: (Expr a, IntegralE b) => A a -> E b -> E a
 a !. i = value $ a ! i
 
-
-
--- | The list of UEs adjacent upstream of a UE.
-ueUpstream :: UE -> [UE]
-ueUpstream t = case t of
-  UVRef (UV _ _ _)     -> []
-  UVRef (UVArray _ a)  -> [a]
-  UVRef (UVExtern _ _) -> []
-  UCast _ a   -> [a]
-  UConst _    -> []
-  UAdd a b    -> [a, b]
-  USub a b    -> [a, b]
-  UMul a b    -> [a, b]
-  UDiv a b    -> [a, b]
-  UMod a b    -> [a, b]
-  UNot a      -> [a]
-  UAnd a      -> a
-  UBWNot a    -> [a]
-  UBWAnd a b  -> [a, b]
-  UBWOr  a b  -> [a, b]
-  UShift a _  -> [a]
-  UEq  a b    -> [a, b]
-  ULt  a b    -> [a, b]
-  UMux a b c  -> [a, b, c]
-  UF2B a      -> [a]
-  UD2B a      -> [a]
-  UB2F a      -> [a]
-  UB2D a      -> [a]
--- math.h:
-  UPi         -> []
-  UExp   a    -> [a]
-  ULog   a    -> [a]
-  USqrt  a    -> [a]
-  UPow   a b  -> [a, b]
-  USin   a    -> [a]
-  UAsin  a    -> [a]
-  UCos   a    -> [a]
-  UAcos  a    -> [a]
-  USinh  a    -> [a]
-  UCosh  a    -> [a]
-  UAsinh a    -> [a]
-  UAcosh a    -> [a]
-  UAtan  a    -> [a]
-  UAtanh a    -> [a]
-
--- | The list of all UVs that directly control the value of an expression.
-nearestUVs :: UE -> [UV]
-nearestUVs = nub . f
-  where
-  f :: UE -> [UV]
-  f (UVRef uv@(UVArray _ i)) = [uv] ++ f i
-  f (UVRef uv)               = [uv]
-  f ue                       = concatMap f $ ueUpstream ue
-
--- | All array indexing subexpressions.
-arrayIndices :: UE -> [(UA, UE)]
-arrayIndices = nub . f
-  where
-  f :: UE -> [(UA, UE)]
-  f (UVRef (UVArray ua ue)) = (ua, ue) : f ue
-  f ue = concatMap f $ ueUpstream ue
 
 -- | Converts an typed expression (E a) to an untyped expression (UE).
 ue :: Expr a => E a -> UE
