@@ -1,17 +1,38 @@
 -- | Sharing for UEs, based on IntMaps.  The idea is to share subexpressions of 'UE's.
 
-module UeMap ( ) where
+module Language.Atom.UeMap 
+  ( UeElem (..)
+  , MUV (..)
+  , UeMap
+  , Hash
+  , UeState
+  , getUE
+  , share
+  , ueUpstream
+  , nearestUVs
+  , arrayIndices
+  ) where
 
 import Control.Monad.State
 import qualified Data.IntMap as M
 import Data.Maybe
+import Data.List (nub)
 
-import Language.Atom.Expressions 
+import Language.Atom.Expressions hiding (typeOf)
+import qualified Language.Atom.Expressions as E
+
 type Hash = Int
+
+-- | Untyped variables map.
+data MUV
+  = MUV Int String Const
+  | MUVArray UA Hash
+  | MUVExtern String Type
+  deriving (Show, Eq, Ord)
 
 -- | Corresponds to 'UE's --- the elements in the sharing structure.
 data UeElem
-  = MUVRef UV
+  = MUVRef MUV
   | MUConst Const
   | MUCast  Type Hash
   | MUAdd   Hash Hash
@@ -50,17 +71,69 @@ data UeElem
   | MUAtanh Hash
   deriving (Show, Eq, Ord)
 
+typeOf :: Hash -> UeMap -> Type
+typeOf h mp = case getUE h mp of
+    MUVRef (MUV _ _ a) -> E.typeOf a
+    MUVRef (MUVArray a _) -> E.typeOf a
+    MUVRef (MUVExtern _ t) -> t
+    MUCast t _  -> t
+    MUConst c   -> E.typeOf c
+    MUAdd a _   -> typeOf' a
+    MUSub a _   -> typeOf' a
+    MUMul a _   -> typeOf' a
+    MUDiv a _   -> typeOf' a
+    MUMod a _   -> typeOf' a
+    MUNot _     -> Bool
+    MUAnd _     -> Bool
+    MUBWNot a   -> typeOf' a
+    MUBWAnd a _ -> typeOf' a
+    MUBWOr  a _ -> typeOf' a
+    MUShift a _ -> typeOf' a
+    MUEq  _ _   -> Bool
+    MULt  _ _   -> Bool
+    MUMux _ a _ -> typeOf' a
+    MUF2B _     -> Word32
+    MUD2B _     -> Word64
+    MUB2F _     -> Float
+    MUB2D _     -> Double
+-- math.h:
+    MUPi        -> Double
+    MUExp   a   -> typeOf' a
+    MULog   a   -> typeOf' a
+    MUSqrt  a   -> typeOf' a
+    MUPow   a _ -> typeOf' a
+    MUSin   a   -> typeOf' a
+    MUAsin  a   -> typeOf' a
+    MUCos   a   -> typeOf' a
+    MUAcos  a   -> typeOf' a
+    MUSinh  a   -> typeOf' a
+    MUCosh  a   -> typeOf' a
+    MUAsinh a   -> typeOf' a
+    MUAcosh a   -> typeOf' a
+    MUAtan  a   -> typeOf' a
+    MUAtanh a   -> typeOf' a
+  where 
+  typeOf' h' = typeOf h' mp
+
 -- | An entry in the Map.
-type UeEntry = (Hash, M.IntMap UeElem)
+type UeMap = (Hash, M.IntMap UeElem)
 
 -- | Wrapped in the State Monad.
-type UeMap a = State UeEntry a
+type UeState a = State UeMap a
+
+getUE :: Hash -> UeMap -> UeElem
+getUE h (_,mp) = 
+  case M.lookup h mp of
+    Nothing -> error $ "Error looking up hash " ++ show h ++ " in the UE map."
+    Just e -> e
 
 -- | Create the sharing map.
-share :: UE -> UeMap Hash
+share :: UE -> UeState Hash
 share e = 
   case e of 
-  UVRef v   -> maybeUpdate (MUVRef v)
+  UVRef (UV i j k) -> maybeUpdate (MUVRef $ MUV i j k)
+  UVRef (UVExtern i j) -> maybeUpdate (MUVRef $ MUVExtern i j)
+  UVRef (UVArray arr a) -> unOp a (\x -> MUVRef (MUVArray arr x))
   UConst  a     -> maybeUpdate (MUConst a)
   UCast   t a   -> unOp a (MUCast t)
   UAdd    a b   -> binOp (a,b) MUAdd
@@ -100,25 +173,25 @@ share e =
 
 -- XXX I could combine some of the following functions (unOp, binOp, etc.) to
 -- slightly reduce code...
-unOp :: UE -> (Hash -> UeElem) -> UeMap Hash
+unOp :: UE -> (Hash -> UeElem) -> UeState Hash
 unOp e code = do
   h <- share e  
   maybeUpdate (code h)
 
-binOp :: (UE, UE) -> (Hash -> Hash -> UeElem) -> UeMap Hash
+binOp :: (UE, UE) -> (Hash -> Hash -> UeElem) -> UeState Hash
 binOp (e0,e1) code = do
   h0 <- share e0  
   h1 <- share e1  
   maybeUpdate (code h0 h1)
 
-triOp :: (UE, UE, UE) -> (Hash -> Hash -> Hash -> UeElem) -> UeMap Hash
+triOp :: (UE, UE, UE) -> (Hash -> Hash -> Hash -> UeElem) -> UeState Hash
 triOp (e0,e1,e2) code = do
   h0 <- share e0  
   h1 <- share e1  
   h2 <- share e2  
   maybeUpdate (code h0 h1 h2)
 
-listOp :: [UE] -> ([Hash] -> UeElem) -> UeMap Hash
+listOp :: [UE] -> ([Hash] -> UeElem) -> UeState Hash
 listOp es code = do
   hashes <- foldM (\hashes e -> do h <- share e 
                                    return (h:hashes)
@@ -128,7 +201,7 @@ listOp es code = do
 -- | Lookup an element in the map, and if it's in there, do nothing, but return
 -- its hash value.  Otherwise, update the map and return the new hash value
 -- for the inserted element.
-maybeUpdate :: UeElem -> UeMap Hash
+maybeUpdate :: UeElem -> UeState Hash
 maybeUpdate code = do
   st <- get
   case getHash code (snd st) of
@@ -136,7 +209,7 @@ maybeUpdate code = do
     Just h -> return h
   where
   -- Update the map.
-  update :: UeElem -> UeEntry -> UeMap Hash
+  update :: UeElem -> UeMap -> UeState Hash
   update code st = do let hash = fst st + 1
                       put (hash, M.insert hash code (snd st))
                       return hash
@@ -147,3 +220,65 @@ maybeUpdate code = do
     M.foldWithKey (\k code m -> if isJust m then m
                                   else if e == code then Just k
                                          else Nothing) Nothing st
+
+-- | The list of Hashes to adjacent upstream of a UE.
+ueUpstream :: Hash -> UeMap -> [Hash]
+ueUpstream h t = case getUE h t of
+  MUVRef (MUV _ _ _)     -> []
+  MUVRef (MUVArray _ a)  -> [a]
+  MUVRef (MUVExtern _ _) -> []
+  MUCast _ a   -> [a]
+  MUConst _    -> []
+  MUAdd a b    -> [a, b]
+  MUSub a b    -> [a, b]
+  MUMul a b    -> [a, b]
+  MUDiv a b    -> [a, b]
+  MUMod a b    -> [a, b]
+  MUNot a      -> [a]
+  MUAnd a      -> a
+  MUBWNot a    -> [a]
+  MUBWAnd a b  -> [a, b]
+  MUBWOr  a b  -> [a, b]
+  MUShift a _  -> [a]
+  MUEq  a b    -> [a, b]
+  MULt  a b    -> [a, b]
+  MUMux a b c  -> [a, b, c]
+  MUF2B a      -> [a]
+  MUD2B a      -> [a]
+  MUB2F a      -> [a]
+  MUB2D a      -> [a]
+-- math.h:
+  MUPi         -> []
+  MUExp   a    -> [a]
+  MULog   a    -> [a]
+  MUSqrt  a    -> [a]
+  MUPow   a b  -> [a, b]
+  MUSin   a    -> [a]
+  MUAsin  a    -> [a]
+  MUCos   a    -> [a]
+  MUAcos  a    -> [a]
+  MUSinh  a    -> [a]
+  MUCosh  a    -> [a]
+  MUAsinh a    -> [a]
+  MUAcosh a    -> [a]
+  MUAtan  a    -> [a]
+  MUAtanh a    -> [a]
+
+-- | The list of all UVs that directly control the value of an expression.
+nearestUVs :: Hash -> UeMap -> [MUV]
+nearestUVs h mp = nub $ f h
+  where
+  f :: Hash -> [MUV]
+  f hash = case getUE hash mp of
+             (MUVRef uv@(MUVArray _ h')) -> [uv] ++ f h'
+             (MUVRef uv)                 -> [uv]
+             _                           -> concatMap f $ ueUpstream hash mp
+
+-- | All array indexing subexpressions.
+arrayIndices :: Hash -> UeMap -> [(UA, Hash)]
+arrayIndices h mp = nub $ f h
+  where
+  f :: Hash -> [(UA, Hash)]
+  f hash = case getUE hash mp of
+             (MUVRef (MUVArray ua h')) -> (ua, h') : f h'
+             _ -> concatMap f $ ueUpstream hash mp
