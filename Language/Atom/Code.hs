@@ -208,9 +208,11 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , preCode
     , ""
     , "static " ++ globalType ++ " " ++ globalClk ++ " = 0;"
+    , ""
     , case hardwareClock config of
         Nothing -> ""
         Just _  -> "static " ++ globalType ++ " " ++ phaseStartTime ++ ";"
+    , ""
     , codeIf (cRuleCoverage config) $ "static const " ++ cType Word32
                  ++ " __coverage_len = " ++ show covLen ++ ";"
     , codeIf (cRuleCoverage config) $ "static " ++ cType Word32
@@ -271,22 +273,22 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
         , "      /* system time rolled over, the start time of the"
         , "         phase did not, i.e. we are not late if currentTime"
         , "         is already in between lastPhaseStartTime and phaseStartTime */"
-        , "      if ( ( " ++ currentTime ++ " >= " ++ lastPhaseStartTime ++ " ) "
-        , "             && ( " ++ currentTime ++ " < " ++ phaseStartTime ++ " ) )"
+        , "      if ( ( " ++ currentTime ++ " >= " ++ lastPhaseStartTime ++ " )"
+        , "             && ( " ++ phaseStartTime ++ " >= " ++ currentTime ++ " ) ) {"
         , "        " ++ delayFn ++ " ( " ++ phaseStartTime ++ " - " ++ currentTime ++ " );"
-        , "      else {"
+        , "      } else {"
         , "        /* we are late */"
         , "        " ++ errHandler
         , "      }"
         , "    }"
         , "  } else {"
         , "    /* phase start time rolled over */"
-        , "    if (" ++ currentTime ++ " >= " ++ lastTime ++ ") {"
+        , "    if ( " ++ currentTime ++ " >= " ++ lastTime ++ " ) {"
         , "      /* current time did not yet roll over */"
-        , "      if (" ++ currentTime ++ " >= " ++ phaseStartTime ++ ") {"
-        , "        " ++ delayFn ++ " ( " ++ maxConst
+        , "      if ( " ++ currentTime ++ " >= " ++ phaseStartTime ++ " ) {"
+        , "        " ++ delayFn ++ " ( ( " ++ maxConst
                          ++ " - ( " ++ currentTime
-                             ++ " - " ++ phaseStartTime ++ " )" ++ " );"
+                             ++ " - " ++ phaseStartTime ++ " ) + 1 )" ++ " );"
         , "      } else {"
         , "        /* this should not happen, since " ++ phaseConst ++ " should be"
         , "           smaller than " ++ maxConst ++ " and " ++ lastTime ++ " should"
@@ -372,7 +374,6 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
                                           Word32 -> Word32
                                           Word64 -> Word64
                                           _      -> clkTypeErr)
-
   clkTypeErr :: a
   clkTypeErr = error "Clock type must be one of Word8, Word16, Word32, Word64."
 
