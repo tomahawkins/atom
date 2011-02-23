@@ -82,7 +82,8 @@ atom name design = do
   name' <- addName name
   (g1, parent) <- get
   (a, (g2, child)) <- liftIO $ buildAtom g1 { gState = [] } name' design
-  put (g2 { gState = gState g1 ++ [StateHierarchy name $ gState g2] }, parent { atomSubs = atomSubs parent ++ [child] })
+  put ( g2 { gState = gState g1 ++ [StateHierarchy name $ gState g2] }
+      , parent { atomSubs = atomSubs parent ++ [child] })
   return a
 
 -- | Defines the period of execution of sub rules as a factor of the base rate of the system.

@@ -4,10 +4,14 @@ module Language.Atom.UeMap
   ( UeElem (..)
   , MUV (..)
   , UeMap
+  , emptyMap
   , Hash
-  , UeState
+  , typeOf
+--  , UeState
+  , recoverUE
   , getUE
-  , share
+  , newUE
+--  , share
   , ueUpstream
   , nearestUVs
   , arrayIndices
@@ -121,11 +125,21 @@ type UeMap = (Hash, M.IntMap UeElem)
 -- | Wrapped in the State Monad.
 type UeState a = State UeMap a
 
+-- | Get the element associated with a 'Hash' value.  It's an error if the
+-- element is not in the map.
 getUE :: Hash -> UeMap -> UeElem
 getUE h (_,mp) = 
   case M.lookup h mp of
     Nothing -> error $ "Error looking up hash " ++ show h ++ " in the UE map."
     Just e -> e
+
+-- | Put a new 'UE' in the map, unless it's already in there, and return the
+-- hash pointing to the 'UE' and a new map.
+newUE :: UE -> UeMap -> (Hash, UeMap)
+newUE ue mp = runState (share ue) mp
+
+emptyMap :: UeMap
+emptyMap = (0, M.empty)
 
 -- | Create the sharing map.
 share :: UE -> UeState Hash
@@ -220,6 +234,50 @@ maybeUpdate code = do
     M.foldWithKey (\k code m -> if isJust m then m
                                   else if e == code then Just k
                                          else Nothing) Nothing st
+
+-- | Get a 'UE' back out of the 'UeMap'.
+recoverUE :: UeMap -> Hash -> UE
+recoverUE st h = case getUE h st of
+  MUVRef (MUV i j k)     -> UVRef (UV i j k)
+  MUVRef (MUVArray i a)  -> UVRef (UVArray i (recover' a))
+  MUVRef (MUVExtern i j) -> UVRef (UVExtern i j)
+  MUCast t a   -> UCast   t (recover' a)
+  MUConst a    -> UConst  a
+  MUAdd a b    -> UAdd    (recover' a) (recover' b)
+  MUSub a b    -> USub    (recover' a) (recover' b)
+  MUMul a b    -> UMul    (recover' a) (recover' b)
+  MUDiv a b    -> UDiv    (recover' a) (recover' b)
+  MUMod a b    -> UMod    (recover' a) (recover' b)
+  MUNot a      -> UNot (recover' a)
+  MUAnd a      -> UAnd $ map recover' a
+  MUBWNot a    -> UBWNot (recover' a)
+  MUBWAnd a b  -> UBWAnd  (recover' a) (recover' b)
+  MUBWOr  a b  -> UBWOr   (recover' a) (recover' b)
+  MUShift a b  -> UShift  (recover' a) b
+  MUEq  a b    -> UEq     (recover' a) (recover' b)
+  MULt  a b    -> ULt     (recover' a) (recover' b)
+  MUMux a b c  -> UMux (recover' a) (recover' b) (recover' c)
+  MUF2B a      -> UF2B    (recover' a)
+  MUD2B a      -> UD2B    (recover' a)
+  MUB2F a      -> UB2F    (recover' a)
+  MUB2D a      -> UB2D    (recover' a)
+-- math.h:
+  MUPi         -> UPi
+  MUExp   a    -> UExp    (recover' a)
+  MULog   a    -> ULog    (recover' a)
+  MUSqrt  a    -> USqrt   (recover' a)
+  MUPow   a b  -> UPow (recover' a) (recover' b)
+  MUSin   a    -> USin    (recover' a)
+  MUAsin  a    -> UAsin   (recover' a)
+  MUCos   a    -> UCos    (recover' a)
+  MUAcos  a    -> UAcos   (recover' a)
+  MUSinh  a    -> USinh   (recover' a)
+  MUCosh  a    -> UCosh   (recover' a)
+  MUAsinh a    -> UAsinh  (recover' a)
+  MUAcosh a    -> UAcosh  (recover' a)
+  MUAtan  a    -> UAtan   (recover' a)
+  MUAtanh a    -> UAtanh  (recover' a)
+  where recover' h' = recoverUE st h'
 
 -- | The list of Hashes to adjacent upstream of a UE.
 ueUpstream :: Hash -> UeMap -> [Hash]

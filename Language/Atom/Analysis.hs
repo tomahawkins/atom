@@ -5,6 +5,7 @@ module Language.Atom.Analysis
 
 import Language.Atom.Elaboration
 import Language.Atom.Expressions
+import Language.Atom.UeMap
 
 -- | Topologically sorts a list of expressions and subexpressions.
 topo :: [UE] -> [(UE, String)]

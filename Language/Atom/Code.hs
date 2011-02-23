@@ -18,6 +18,7 @@ import Language.Atom.Analysis
 import Language.Atom.Elaboration
 import Language.Atom.Expressions
 import Language.Atom.Scheduling
+import Language.Atom.UeMap
 
 -- | C code configuration parameters.
 data Config = Config
@@ -112,12 +113,12 @@ cType t = case t of
   Float  -> "float"
   Double -> "double"
 
-codeUE :: Config -> [(UE, String)] -> String -> (UE, String) -> String
-codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ basic operands ++ ";\n"
+codeUE :: Config -> UeMap -> String -> UeMap -> String
+codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ basic ++ ";\n"
   where
   operands = map (fromJust . flip lookup ues) $ ueUpstream ue
-  basic :: [String] -> String
-  basic operands = concat $ case ue of
+  basic :: String
+  basic = concat $ case ue of
     UVRef (UV _ n _)                 -> [cStateName config, ".", n]
     UVRef (UVArray (UA _ n _) _)     -> [cStateName config, ".", n, "[", a, "]"]
     UVRef (UVArray (UAExtern n _) _) -> [n, "[", a, "]"]
@@ -167,6 +168,62 @@ codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ bas
             Float     -> "f"
             Double    -> ""
             _         -> error "unhandled float type"
+
+-- codeUE :: Config -> [(UE, String)] -> String -> (UE, String) -> String
+-- codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ basic operands ++ ";\n"
+--   where
+--   operands = map (fromJust . flip lookup ues) $ ueUpstream ue
+--   basic :: [String] -> String
+--   basic operands = concat $ case ue of
+--     UVRef (UV _ n _)                 -> [cStateName config, ".", n]
+--     UVRef (UVArray (UA _ n _) _)     -> [cStateName config, ".", n, "[", a, "]"]
+--     UVRef (UVArray (UAExtern n _) _) -> [n, "[", a, "]"]
+--     UVRef (UVExtern n _)             -> [n]
+--     UCast _ _            -> ["(", cType (typeOf ue), ") ", a]
+--     UConst c             -> [showConst c]
+--     UAdd _ _             -> [a, " + ", b]
+--     USub _ _             -> [a, " - ", b]
+--     UMul _ _             -> [a, " * ", b]
+--     UDiv _ _             -> [a, " / ", b]
+--     UMod _ _             -> [a, " % ", b]
+--     UNot _               -> ["! ", a]
+--     UAnd _               -> intersperse " && " operands
+--     UBWNot _             -> ["~ ", a]
+--     UBWAnd _ _           -> [a, " & ", b]
+--     UBWOr  _ _           -> [a, " | ", b]
+--     UShift _ n           -> (if n >= 0 then [a, " << ", show n] else [a, " >> ", show (negate n)])
+--     UEq  _ _             -> [a, " == ", b]
+--     ULt  _ _             -> [a, " < " , b]
+--     UMux _ _ _           -> [a, " ? " , b, " : ", c]
+--     UF2B _               -> ["*((", ct Word32, " *) &(", a, "))"]
+--     UD2B _               -> ["*((", ct Word64, " *) &(", a, "))"]
+--     UB2F _               -> ["*((", ct Float , " *) &(", a, "))"]
+--     UB2D _               -> ["*((", ct Double, " *) &(", a, "))"]
+-- -- math.h:
+--     UPi                  -> [ "M_PI" ]
+--     UExp   _             -> [ "exp",   f, " ( ", a, " )"]
+--     ULog   _             -> [ "log",   f, " ( ", a, " )"]
+--     USqrt  _             -> [ "sqrt",  f, " ( ", a, " )"]
+--     UPow   _ _           -> [ "pow",   f, " ( ", a, ", ", b, " )"]
+--     USin   _             -> [ "sin",   f, " ( ", a, " )"]
+--     UAsin  _             -> [ "asin",  f, " ( ", a, " )"]
+--     UCos   _             -> [ "cos",   f, " ( ", a, " )"]
+--     UAcos  _             -> [ "acos",  f, " ( ", a, " )"]
+--     USinh  _             -> [ "sinh",  f, " ( ", a, " )"]
+--     UCosh  _             -> [ "cosh",  f, " ( ", a, " )"]
+--     UAsinh _             -> [ "asinh", f, " ( ", a, " )"]
+--     UAcosh _             -> [ "acosh", f, " ( ", a, " )"]
+--     UAtan  _             -> [ "atan",  f, " ( ", a, " )"]
+--     UAtanh _             -> [ "atanh", f, " ( ", a, " )"]
+--     where
+--       ct = cType
+--       a = head operands
+--       b = operands !! 1
+--       c = operands !! 2
+--       f = case ( typeOf ue ) of
+--             Float     -> "f"
+--             Double    -> ""
+--             _         -> error "unhandled float type"
 
 type RuleCoverage = [(Name, Int, Int)]
 
