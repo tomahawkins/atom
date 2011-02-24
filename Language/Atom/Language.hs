@@ -66,10 +66,12 @@ import Control.Monad
 import Control.Monad.Trans
 import Data.Int
 import Data.Word
+import Data.List (foldl')
 
 import Language.Atom.Elaboration hiding (Atom)
 import qualified Language.Atom.Elaboration as E
 import Language.Atom.Expressions
+import Language.Atom.UeMap hiding (typeOf)
 
 infixr 1 <==
 
@@ -80,10 +82,10 @@ type Atom = E.Atom
 atom :: Name -> Atom a -> Atom a
 atom name design = do
   name' <- addName name
-  (g1, parent) <- get
-  (a, (g2, child)) <- liftIO $ buildAtom g1 { gState = [] } name' design
-  put ( g2 { gState = gState g1 ++ [StateHierarchy name $ gState g2] }
-      , parent { atomSubs = atomSubs parent ++ [child] })
+  (st1, (g1, parent)) <- get
+  (a, (st2, (g2, child))) <- liftIO $ buildAtom st1 g1 { gState = [] } name' design
+  put (st2, ( g2 { gState = gState g1 ++ [StateHierarchy name $ gState g2] }
+            , parent { atomSubs = atomSubs parent ++ [child] }))
   return a
 
 -- | Defines the period of execution of sub rules as a factor of the base rate of the system.
@@ -93,30 +95,30 @@ atom name design = do
 period :: Int -> Atom a -> Atom a
 period n _ | n <= 0 = error "ERROR: Execution period must be greater than 0."
 period n atom = do
-  (g, a) <- get
-  put (g { gPeriod = n }, a)
+  (st, (g, a)) <- get
+  put (st, (g { gPeriod = n }, a))
   r <- atom
-  (g', a) <- get
-  put (g' { gPeriod = gPeriod g }, a)
+  (st', (g', a)) <- get
+  put (st', (g' { gPeriod = gPeriod g }, a))
   return r
 
 -- | Returns the execution period of the current scope.
 getPeriod :: Atom Int
 getPeriod = do
-  (g, _) <- get
+  (st, (g, _)) <- get
   return $ gPeriod g
 
 phase' :: (Int -> Phase) -> Int -> Atom a -> Atom a
 phase' _ n _ | n < 0 = error $ "ERROR: phase " ++ show n ++ " must be at least 0."
 phase' phType n atom = do
-  (g, a) <- get
+  (st, (g, a)) <- get
   if (n >= gPeriod g) 
     then error $ "ERROR: phase " ++ show n ++ " must be less than the current period "
                ++ show (gPeriod g) ++ "."
-    else do put (g { gPhase = phType n }, a)
+    else do put (st, (g { gPhase = phType n }, a))
             r <- atom
-            (g', a) <- get
-            put (g' { gPhase = gPhase g }, a)
+            (st', (g', a)) <- get
+            put (st', (g' { gPhase = gPhase g }, a))
             return r
     -- XXX
     -- else do put (g { gPhase = n }, a)
@@ -139,7 +141,7 @@ exactPhase n a = phase' ExactPhase n a
 -- | Returns the phase of the current scope.
 getPhase :: Atom Int
 getPhase = do
-  (g, _) <- get
+  (st, (g, _)) <- get
   return $ case gPhase g of
              MinPhase ph   -> ph
              ExactPhase ph -> ph
@@ -147,7 +149,7 @@ getPhase = do
 -- | Returns the current atom hierarchical path.
 path :: Atom String
 path = do
-  (_, atom) <- get
+  (st, (_, atom)) <- get
   return $ atomName atom
 
 -- | Local boolean variable declaration.
@@ -241,8 +243,11 @@ double' name = var' name Double
 -- | Declares an action.
 action :: ([String] -> String) -> [UE] -> Atom ()
 action f ues = do
-  (g, a) <- get
-  put (g, a { atomActions = atomActions a ++ [(f, ues)] })
+  (st, (g, a)) <- get
+  let (st', hashes) = foldl' (\(accSt,hs) ue -> let (h,accSt') = newUE ue accSt in
+                                                (accSt',h:hs))
+                             (st,[]) ues
+  put (st', (g, a { atomActions = atomActions a ++ [(f, hashes)] }))
 
 -- | Calls an external C function of type 'void f(void)'.
 call :: Name -> Atom ()
@@ -251,18 +256,19 @@ call n = action (\ _ -> n ++ "()") []
 -- | Declares a probe.
 probe :: Expr a => Name -> E a -> Atom ()
 probe name a = do
-  (g, atom) <- get
+  (st, (g, atom)) <- get
+  let (h,st') = newUE (ue a) st
   if any (\ (n, _) -> name == n) $ gProbes g
     then error $ "ERROR: Duplicated probe name: " ++ name
-    else put (g { gProbes = (name, ue a) : gProbes g }, atom)
-
+    else put (st', (g { gProbes = (name, h) : gProbes g }, atom))
 
 -- | Fetches all declared probes to current design point.
 probes :: Atom [(String, UE)]
 probes = do
-  (g, _) <- get
-  return $ gProbes g
-
+  (st, (g, _)) <- get
+  let (strs,hs) = unzip (gProbes g)
+  let g' = zip strs (map (recoverUE st) hs)
+  return g'
 
 -- | Increments a NumE 'V'.
 incr :: (Assign a, NumE a) => V a -> Atom ()
@@ -277,8 +283,10 @@ class Expr a => Assign a where
   -- | Assign an 'E' to a 'V'.
   (<==) :: V a -> E a -> Atom ()
   v <== e = do
-    (g, atom) <- get
-    put (g, atom { atomAssigns = (uv v, ue e) : atomAssigns atom })
+    (st, (g, atom)) <- get
+    let (h,st0) = newUE (ue e) st
+    let (muv,st1) = newUV (uv v) st0
+    put (st1, (g, atom { atomAssigns = (muv, h) : atomAssigns atom }))
 
 instance Assign Bool
 instance Assign Int8
@@ -293,12 +301,14 @@ instance Assign Float
 instance Assign Double
 
 -- | Adds an enabling condition to an atom subtree of rules.
---   This condition must be true before any rules in hierarchy
---   are allowed to execute.
+-- This condition must be true before any rules in hierarchy
+-- are allowed to execute.
 cond :: E Bool -> Atom ()
 cond c = do
-  (g, atom) <- get
-  put (g, atom { atomEnable = uand (atomEnable atom) (ue c) })
+  (st, (g, atom)) <- get
+  let ae = recoverUE st (atomEnable atom)
+  let (h,st') = newUE (uand ae (ue c)) st
+  put (st', (g, atom { atomEnable = h}))
 
 -- | Reference to the 64-bit free running clock.
 clock :: E Word64
@@ -316,10 +326,11 @@ nextCoverage = do
 --   Assertion names should be globally unique.
 assert :: Name -> E Bool -> Atom ()
 assert name check = do
-  (g, atom) <- get
+  (st, (g, atom)) <- get
   let names = fst $ unzip $ atomAsserts atom
   when (elem name names) (liftIO $ putStrLn $ "WARNING: Assertion name already used: " ++ name)
-  put (g, atom { atomAsserts = (name, ue check) : atomAsserts atom })
+  let (chk,st') = newUE (ue check) st
+  put (st', (g, atom { atomAsserts = (name, chk) : atomAsserts atom }))
 
 -- | Implication assertions.  Creates an implicit coverage point for the precondition.
 assertImply :: Name -> E Bool -> E Bool -> Atom ()
@@ -332,8 +343,9 @@ assertImply name a b = do
 --   Coverage names should be globally unique.
 cover :: Name -> E Bool -> Atom ()
 cover name check = do
-  (g, atom) <- get
+  (st, (g, atom)) <- get
   let names = fst $ unzip $ atomCovers atom
   when (elem name names) (liftIO $ putStrLn $ "WARNING: Coverage name already used: " ++ name)
-  put (g, atom { atomCovers = (name, ue check) : atomCovers atom })
+  let (chk,st') = newUE (ue check) st
+  put (st', (g, atom { atomCovers = (name, chk) : atomCovers atom }))
 

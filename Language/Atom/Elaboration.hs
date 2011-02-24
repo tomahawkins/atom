@@ -1,8 +1,8 @@
 module Language.Atom.Elaboration
   (
-    UeStateT
+--    UeStateT
   -- * Atom monad and container.
-  , Atom
+    Atom
   , AtomDB     (..)
   , Global     (..)
   , Rule       (..)
@@ -183,31 +183,29 @@ reIdRules i (a:b) = case a of
   Rule _ _ _ _ _ _ _ _ -> a { ruleId = i } : reIdRules (i + 1) b
   _                    -> a                : reIdRules  i      b
 
--- | Lift the state monad holding the 'UE' pointers.
-type UeStateT a = S.StateT UeMap a
-
-buildAtom :: Global -> Name -> Atom a -> UeStateT IO (a, (Global, AtomDB))
-buildAtom g name (Atom f) = do
-  st <- S.get
+buildAtom :: UeMap -> Global -> Name -> Atom a -> IO (a, AtomSt)
+buildAtom st g name (Atom f) = do
   let (h,st') = newUE (ubool True) st
-  S.put st' 
-  db <- (liftIO . f) (g { gRuleId = gRuleId g + 1 }, AtomDB
-    { atomId        = gRuleId g
-    , atomName      = name
-    , atomNames     = []
-    , atomEnable    = h 
-    , atomSubs      = []
-    , atomPeriod    = gPeriod g
-    , atomPhase     = gPhase  g
-    , atomAssigns   = []
-    , atomActions   = []
-    , atomAsserts   = []
-    , atomCovers    = []
-    })
-  S.return db
+--  S.put st' 
+  f (st', (g { gRuleId = gRuleId g + 1 }, AtomDB
+                 { atomId        = gRuleId g
+                 , atomName      = name
+                 , atomNames     = []
+                 , atomEnable    = h 
+                 , atomSubs      = []
+                 , atomPeriod    = gPeriod g
+                 , atomPhase     = gPhase  g
+                 , atomAssigns   = []
+                 , atomActions   = []
+                 , atomAsserts   = []
+                 , atomCovers    = []
+                 }))
+--  S.return db
+
+type AtomSt = (UeMap, (Global, AtomDB))
 
 -- | The Atom monad holds variable and rule declarations.
-data Atom a = Atom ((Global, AtomDB) -> IO (a, (Global, AtomDB)))
+data Atom a = Atom (AtomSt -> IO (a, AtomSt))
 
 instance Monad Atom where
   return a = Atom (\ s -> return (a, s))
@@ -225,10 +223,10 @@ instance MonadIO Atom where
       a <- io
       return (a, s)
 
-get :: Atom (Global, AtomDB)
+get :: Atom AtomSt
 get = Atom (\ s -> return (s, s))
 
-put :: (Global, AtomDB) -> Atom ()
+put :: AtomSt -> Atom ()
 put s = Atom (\ _ -> return ((), s))
 
 -- | A Relation is used for relative performance constraints between 'Action's.
@@ -244,15 +242,15 @@ elaborate :: UeMap -> Name -> Atom ()
                           , [(Name, Type)])
                        ))
 elaborate st name atom = do
-  ((_, (g, atomDB)),st0) <- S.runStateT (buildAtom Global { gRuleId = 0
-                                                          , gVarId = 0
-                                                          , gArrayId = 0
-                                                          , gState = []
-                                                          , gProbes = []
-                                                          , gPeriod = 1
-                                                          , gPhase  = MinPhase 0 
-                                                          } name atom)
-                                        st
+  (_, (st0, (g, atomDB))) <- buildAtom st Global { gRuleId = 0
+                                                 , gVarId = 0
+                                                 , gArrayId = 0
+                                                 , gState = []
+                                                 , gProbes = []
+                                                 , gPeriod = 1
+                                                 , gPhase  = MinPhase 0 
+                                                 } 
+                                       name atom 
   let (h,st1) = newUE (ubool True) st0
       (getRules,st2) = S.runState (elaborateRules h atomDB) st1
       rules = reIdRules 0 getRules
@@ -334,10 +332,10 @@ data UVLocality = Array UA UE | External String Type deriving (Show, Eq, Ord)
 var :: Expr a => Name -> a -> Atom (V a)
 var name init = do
   name' <- addName name
-  (g, atom) <- get
+  (st, (g, atom)) <- get
   let uv = UV (gVarId g) name' c
       c = constant init
-  put (g { gVarId = gVarId g + 1, gState = gState g ++ [StateVariable name c] }, atom)
+  put (st, (g { gVarId = gVarId g + 1, gState = gState g ++ [StateVariable name c] }, atom))
   return $ V uv
 
 -- | Generic external variable declaration.
@@ -349,10 +347,10 @@ array :: Expr a => Name -> [a] -> Atom (A a)
 array name [] = error $ "ERROR: arrays can not be empty: " ++ name
 array name init = do
   name' <- addName name
-  (g, atom) <- get
+  (st, (g, atom)) <- get
   let ua = UA (gArrayId g) name' c
       c = map constant init
-  put (g { gArrayId = gArrayId g + 1, gState = gState g ++ [StateArray name c] }, atom)
+  put (st, (g { gArrayId = gArrayId g + 1, gState = gState g ++ [StateArray name c] }, atom))
   return $ A ua
 
 -- | Generic external array declaration.
@@ -361,12 +359,12 @@ array' name t = A $ UAExtern  name t
 
 addName :: Name -> Atom Name
 addName name = do
-  (g, atom) <- get
+  (st, (g, atom)) <- get
   checkName name
   if elem name (atomNames atom)
     then error $ "ERROR: Name \"" ++ name ++ "\" not unique in " ++ show atom ++ "."
     else do
-      put (g, atom { atomNames = name : atomNames atom })
+      put (st, (g, atom { atomNames = name : atomNames atom }))
       return $ atomName atom ++ "." ++ name
 
 -- still accepts some misformed names

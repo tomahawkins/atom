@@ -11,6 +11,7 @@ module Language.Atom.UeMap
   , recoverUE
   , getUE
   , newUE
+  , newUV
 --  , share
   , maybeUpdate
   , ueUpstream
@@ -35,6 +36,15 @@ data MUV
   | MUVArray UA Hash
   | MUVExtern String Type
   deriving (Show, Eq, Ord)
+
+-- | Transforms a 'UV' into a 'MUV', returning the possibly updated map.
+newUV :: UV -> UeMap -> (MUV, UeMap)
+newUV uv mp = 
+  case uv of
+    UV i j k       -> (MUV i j k, mp)
+    UVExtern i j   -> (MUVExtern i j, mp)
+    UVArray arr ue -> let (h,mp') = newUE ue mp in
+                      (MUVArray arr h, mp')
 
 -- | Corresponds to 'UE's --- the elements in the sharing structure.
 data UeElem
