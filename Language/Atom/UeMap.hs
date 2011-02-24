@@ -7,14 +7,16 @@ module Language.Atom.UeMap
   , emptyMap
   , Hash
   , typeOf
---  , UeState
+  , UeState
   , recoverUE
   , getUE
   , newUE
 --  , share
+  , maybeUpdate
   , ueUpstream
   , nearestUVs
   , arrayIndices
+  , isMathHCall
   ) where
 
 import Control.Monad.State
@@ -340,3 +342,25 @@ arrayIndices h mp = nub $ f h
   f hash = case getUE hash mp of
              (MUVRef (MUVArray ua h')) -> (ua, h') : f h'
              _ -> concatMap f $ ueUpstream hash mp
+
+-- XXX can put this back after making UE map---won't be expensive.
+isMathHCall :: UeElem -> Bool
+isMathHCall fc = 
+  case fc of
+    MUPi        -> True
+    MUExp   _   -> True
+    MULog   _   -> True
+    MUSqrt  _   -> True
+    MUPow   _ _ -> True
+    MUSin   _   -> True
+    MUAsin  _   -> True
+    MUCos   _   -> True
+    MUAcos  _   -> True
+    MUSinh  _   -> True
+    MUCosh  _   -> True
+    MUAsinh _   -> True
+    MUAcosh _   -> True
+    MUAtan  _   -> True
+    MUAtanh _   -> True
+    _          -> False
+

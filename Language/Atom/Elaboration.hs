@@ -1,7 +1,8 @@
 module Language.Atom.Elaboration
   (
+    UeStateT
   -- * Atom monad and container.
-    Atom
+  , Atom
   , AtomDB     (..)
   , Global     (..)
   , Rule       (..)
@@ -28,8 +29,11 @@ import Control.Monad.Trans
 import Data.Function (on)
 import Data.List
 import Data.Char
-import Language.Atom.Expressions
+import qualified Control.Monad.State as S
+
+import Language.Atom.Expressions hiding (typeOf)
 import Language.Atom.UeMap
+
 
 type UID = Int
 
@@ -98,36 +102,80 @@ instance Eq   AtomDB where (==) = (==) `on` atomId
 instance Ord  AtomDB where compare a b = compare (atomId a) (atomId b)
 instance Show Rule   where show = ruleName
 
-elaborateRules:: Hash -> UeMap -> AtomDB -> [Rule]
-elaborateRules parentEnable mp atom = if isRule then rule : rules else rules
+elaborateRules:: Hash -> AtomDB -> UeState [Rule]
+elaborateRules parentEnable atom = 
+  if isRule 
+    then do r <- rule
+            rs <- rules 
+            return $ r : rs 
+    else rules
   where
   isRule = not $ null (atomAssigns atom) && null (atomActions atom)
-  enable = uand parentEnable $ atomEnable atom
-  rule = Rule
-    { ruleId        = atomId   atom
-    , ruleName      = atomName atom
-    , ruleEnable    = enable
-    , ruleAssigns   = map enableAssign $ atomAssigns atom
-    , ruleActions   = atomActions atom
-    , rulePeriod    = atomPeriod  atom
-    , rulePhase     = atomPhase   atom
-    , mathH         = any isMathHCall (allUEs rule)
-    }
-  assert (name, ue) = Assert
-    { ruleName      = name
-    , ruleEnable    = enable
-    , ruleAssert    = ue
-    }
-  cover (name, ue) = Cover
-    { ruleName      = name
-    , ruleEnable    = enable
-    , ruleCover     = ue
-    }
-  rules =    map assert (atomAsserts atom) 
-          ++ map cover (atomCovers atom) 
-          ++ concatMap (elaborateRules enable) (atomSubs atom)
-  enableAssign :: (MUV, Hash) -> (MUV, Hash)
-  enableAssign (uv, ue) = (uv, umux enable ue $ UVRef uv)
+  enable :: UeState Hash
+  enable = do
+    st <- S.get
+    let (h,st') =  newUE (uand (recoverUE st parentEnable)
+                               (recoverUE st (atomEnable atom)))
+                         st
+    S.put st'
+    return h
+  rule :: UeState Rule
+  rule = do 
+    h <- enable 
+    assigns <- S.foldM (\prs pr -> do pr' <- enableAssign pr
+                                      return $ pr' : prs) [] (atomAssigns atom)
+    r <- rule
+    st <- S.get
+    return $ Rule
+      { ruleId        = atomId   atom
+      , ruleName      = atomName atom
+      , ruleEnable    = h
+      , ruleAssigns   = assigns
+      , ruleActions   = atomActions atom
+      , rulePeriod    = atomPeriod  atom
+      , rulePhase     = atomPhase   atom
+      , mathH         = any isMathHCall (map (flip getUE st) (allUEs r))
+      }
+  assert :: (Name, Hash) -> UeState Rule
+  assert (name, ue) = do 
+    h <- enable 
+    return $ Assert
+      { ruleName      = name
+      , ruleEnable    = h
+      , ruleAssert    = ue
+      }
+  cover :: (Name, Hash) -> UeState Rule
+  cover (name, ue) = do 
+    h <- enable 
+    return $ Cover
+      { ruleName      = name
+      , ruleEnable    = h
+      , ruleCover     = ue
+      }
+  rules :: UeState [Rule]
+  rules = do
+    asserts <- S.foldM (\rs e -> do r <- assert e
+                                    return $ r:rs
+                       ) [] (atomAsserts atom) 
+    covers  <- S.foldM (\rs e -> do r <- cover e
+                                    return $ r:rs
+                       ) [] (atomCovers atom) 
+    rules'  <- S.foldM (\rs db -> do en <- enable
+                                     r <- elaborateRules en db
+                                     return $ r:rs
+                       ) [] (atomSubs atom)
+    return $ asserts ++ covers ++ concat rules'
+  enableAssign :: (MUV, Hash) -> UeState (MUV, Hash)
+  enableAssign (uv, ue) = do 
+    e <- enable
+    st <- S.get 
+    h <- maybeUpdate (MUVRef uv)
+    let (h',st') = newUE (umux (recoverUE st e) 
+                               (recoverUE st ue) 
+                               (recoverUE st h))
+                         st
+    S.put st'
+    return (uv, h')
 
 reIdRules :: Int -> [Rule] -> [Rule]
 reIdRules _ [] = []
@@ -135,20 +183,28 @@ reIdRules i (a:b) = case a of
   Rule _ _ _ _ _ _ _ _ -> a { ruleId = i } : reIdRules (i + 1) b
   _                    -> a                : reIdRules  i      b
 
-buildAtom :: Global -> Name -> Atom a -> IO (a, (Global, AtomDB))
-buildAtom g name (Atom f) = f (g { gRuleId = gRuleId g + 1 }, AtomDB
-  { atomId        = gRuleId g
-  , atomName      = name
-  , atomNames     = []
-  , atomEnable    = ubool True
-  , atomSubs      = []
-  , atomPeriod    = gPeriod g
-  , atomPhase     = gPhase  g
-  , atomAssigns   = []
-  , atomActions   = []
-  , atomAsserts   = []
-  , atomCovers    = []
-  })
+-- | Lift the state monad holding the 'UE' pointers.
+type UeStateT a = S.StateT UeMap a
+
+buildAtom :: Global -> Name -> Atom a -> UeStateT IO (a, (Global, AtomDB))
+buildAtom g name (Atom f) = do
+  st <- S.get
+  let (h,st') = newUE (ubool True) st
+  S.put st' 
+  db <- (liftIO . f) (g { gRuleId = gRuleId g + 1 }, AtomDB
+    { atomId        = gRuleId g
+    , atomName      = name
+    , atomNames     = []
+    , atomEnable    = h 
+    , atomSubs      = []
+    , atomPeriod    = gPeriod g
+    , atomPhase     = gPhase  g
+    , atomAssigns   = []
+    , atomActions   = []
+    , atomAsserts   = []
+    , atomCovers    = []
+    })
+  S.return db
 
 -- | The Atom monad holds variable and rule declarations.
 data Atom a = Atom ((Global, AtomDB) -> IO (a, (Global, AtomDB)))
@@ -178,31 +234,43 @@ put s = Atom (\ _ -> return ((), s))
 -- | A Relation is used for relative performance constraints between 'Action's.
 -- data Relation = Higher UID | Lower UID deriving (Show, Eq)
 
+-- XXX elaborate is a bit hacky since we're threading state through this
+-- function, but I don't want to go change all the UeState monads to UeStateT
+-- monads.
 -- | Given a top level name and design, elaborates design and returns a design database.
-elaborate :: Name -> Atom () -> UeMap -> IO (Maybe (StateHierarchy, [Rule], [Name], [Name], [(Name, Type)]))
-elaborate name atom mp = do
-  (_, (g, atomDB)) <- buildAtom Global { gRuleId = 0
-                                       , gVarId = 0
-                                       , gArrayId = 0
-                                       , gState = []
-                                       , gProbes = []
-                                       , gPeriod = 1
-                                       , gPhase  = MinPhase 0 
-                                       } name atom
-  let rules = reIdRules 0 $ elaborateRules (ubool True) mp atomDB
+elaborate :: UeMap -> Name -> Atom () 
+          -> IO (Maybe ( UeMap
+                       , (  StateHierarchy, [Rule], [Name], [Name]
+                          , [(Name, Type)])
+                       ))
+elaborate st name atom = do
+  ((_, (g, atomDB)),st0) <- S.runStateT (buildAtom Global { gRuleId = 0
+                                                          , gVarId = 0
+                                                          , gArrayId = 0
+                                                          , gState = []
+                                                          , gProbes = []
+                                                          , gPeriod = 1
+                                                          , gPhase  = MinPhase 0 
+                                                          } name atom)
+                                        st
+  let (h,st1) = newUE (ubool True) st0
+      (getRules,st2) = S.runState (elaborateRules h atomDB) st1
+      rules = reIdRules 0 getRules
       coverageNames  = [ name | Cover  name _ _ <- rules ]
       assertionNames = [ name | Assert name _ _ <- rules ]
-      probeNames = [ (n, typeOf a) | (n, a) <- gProbes g ]
+      probeNames = [ (n, typeOf a st2) | (n, a) <- gProbes g ]
   if (null rules)
     then do
       putStrLn "ERROR: Design contains no rules.  Nothing to do."
       return Nothing
     else do
-      mapM_ (checkEnable mp) rules 
+      mapM_ (checkEnable st) rules
       ok <- mapM checkAssignConflicts rules
       return (if and ok 
-                then Just (trimState $ StateHierarchy name 
-                            $ gState g, rules, assertionNames, coverageNames, probeNames) 
+                then Just (st2
+                          , (trimState $ StateHierarchy name 
+                              $ gState g, rules, assertionNames
+                                  , coverageNames, probeNames))
                 else Nothing)
 
 trimState :: StateHierarchy -> StateHierarchy
@@ -216,15 +284,20 @@ trimState a = case a of
 
 -- | Checks that a rule will not be trivially disabled.
 checkEnable :: UeMap -> Rule -> IO ()
-checkEnable mp rule | getUE (ruleEnable rule) mp == (MUConst $ CBool False) = putStrLn $ "WARNING: Rule will never execute: " ++ show rule
-                 | otherwise                      = return ()
+checkEnable st rule 
+  | ruleEnable rule == (fst $ newUE (ubool False) st) = 
+      putStrLn $ "WARNING: Rule will never execute: " ++ show rule
+  | otherwise                      = return ()
 
--- | Check that a variable is assigned more than once in a rule.  Will eventually be replaced consistent assignment checking.
+-- | Check that a variable is assigned more than once in a rule.  Will
+-- eventually be replaced consistent assignment checking.
 checkAssignConflicts :: Rule -> IO Bool
 checkAssignConflicts rule@(Rule _ _ _ _ _ _ _ _) =
   if length vars /= length vars'
     then do
-      putStrLn $ "ERROR: Rule " ++ show rule ++ " contains multiple assignments to the same variable(s)."
+      putStrLn $ "ERROR: Rule " 
+                   ++ show rule 
+                   ++ " contains multiple assignments to the same variable(s)."
       return False
     else do
       return True
@@ -334,12 +407,12 @@ ruleGraph name rules uvs = do
 -}
 
 -- | All the variables that directly and indirectly control the value of an expression.
-allUVs :: [Rule] -> Hash -> UeMap -> [MUV]
-allUVs rules h mp = fixedpoint next $ nearestUVs h mp
+allUVs :: UeMap -> [Rule] -> Hash -> [MUV]
+allUVs st rules ue = fixedpoint next $ nearestUVs ue st
   where
   assigns = concat [ ruleAssigns r | r@(Rule _ _ _ _ _ _ _ _) <- rules ]
   previousUVs :: MUV -> [MUV]
-  previousUVs uv = concat [ nearestUVs ue mp | (uv', ue) <- assigns, uv == uv' ]
+  previousUVs uv = concat [ nearestUVs ue st | (uv', ue) <- assigns, uv == uv' ]
   next :: [MUV] -> [MUV]
   next uvs = sort $ nub $ uvs ++ concatMap previousUVs uvs
 
@@ -348,8 +421,8 @@ fixedpoint f a | a == f a  = a
                | otherwise = fixedpoint f $ f a
 
 -- | All primary expressions used in a rule.
-allUEs :: Rule -> UeMap -> [Hash]
-allUEs rule mp = ruleEnable rule : ues
+allUEs :: Rule -> [Hash]
+allUEs rule = ruleEnable rule : ues
   where
   index :: MUV -> [Hash]
   index (MUVArray _ ue) = [ue]

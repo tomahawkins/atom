@@ -235,7 +235,7 @@ containMathHFunctions rules =
                       _                    -> False
 
 writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] 
-       -> [Name] -> [(Name, Type)] -> IO RuleCoverage
+       -> [Name] -> [(Name, Type)] -> UeStateT IO RuleCoverage
 writeC name config state rules schedule assertionNames coverageNames probeNames = do
   writeFile (name ++ ".c") c
   writeFile (name ++ ".h") h

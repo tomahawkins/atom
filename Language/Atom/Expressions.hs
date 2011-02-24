@@ -17,10 +17,10 @@ module Language.Atom.Expressions
   , Width (..)
   , TypeOf (..)
   , bytes
---  , ue
---  , uv
+  , ue
+  , uv
 --  , ueUpstream
-  , isMathHCall
+--  , isMathHCall
 --  , nearestUVs
 --  , arrayIndices
   , NumE
@@ -268,27 +268,6 @@ data UE
   | UAtan  UE
   | UAtanh UE
   deriving (Show, Eq, Ord, Data, Typeable)
-
--- XXX can put this back after making UE map---won't be expensive.
-isMathHCall :: UE -> Bool
-isMathHCall fc = 
-  case fc of
-    UPi        -> True
-    UExp   _   -> True
-    ULog   _   -> True
-    USqrt  _   -> True
-    UPow   _ _ -> True
-    USin   _   -> True
-    UAsin  _   -> True
-    UCos   _   -> True
-    UAcos  _   -> True
-    USinh  _   -> True
-    UCosh  _   -> True
-    UAsinh _   -> True
-    UAcosh _   -> True
-    UAtan  _   -> True
-    UAtanh _   -> True
-    _          -> False
 
 class Width a where
   width :: a -> Int
