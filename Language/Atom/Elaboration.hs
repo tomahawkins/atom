@@ -25,6 +25,8 @@ module Language.Atom.Elaboration
   , allUEs
   ) where
 
+import Debug.Trace
+
 import Control.Monad.Trans
 import Data.Function (on)
 import Data.List
@@ -123,8 +125,9 @@ elaborateRules parentEnable atom =
   rule = do 
     h <- enable 
     assigns <- S.foldM (\prs pr -> do pr' <- enableAssign pr                                      
-                                      return $ pr' : prs) [] (atomAssigns atom)
-    st <- S.get
+                                      return $ pr' : prs) [] 
+                       (atomAssigns atom)
+--    st <- S.get
     return $ Rule
       { ruleId        = atomId   atom
       , ruleName      = atomName atom
@@ -271,7 +274,8 @@ elaborate st name atom = do
 
 trimState :: StateHierarchy -> StateHierarchy
 trimState a = case a of
-  StateHierarchy name items -> StateHierarchy name $ filter f $ map trimState items
+  StateHierarchy name items -> 
+    StateHierarchy name $ filter f $ map trimState items 
   a -> a
   where
   f (StateHierarchy _ []) = False
@@ -281,7 +285,7 @@ trimState a = case a of
 -- | Checks that a rule will not be trivially disabled.
 checkEnable :: UeMap -> Rule -> IO ()
 checkEnable st rule 
-  | ruleEnable rule == (fst $ newUE (ubool False) st) = 
+  | trace (show (ruleEnable rule) ++ ":" ++ show (fst $ newUE (ubool False) st) ) $ ruleEnable rule == (fst $ newUE (ubool False) st) = 
       putStrLn $ "WARNING: Rule will never execute: " ++ show rule
   | otherwise                      = return ()
 
