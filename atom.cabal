@@ -36,7 +36,8 @@ library
         base       >= 4.0     && < 5,
         mtl        >= 1.1.0.1 && < 1.2,
         process    >= 1.0.1.1 && < 1.2,
-        syb        >= 0.1.0.0
+        syb        >= 0.1.0.0,
+        containers >= 0.4
 
     exposed-modules:
         Language.Atom
@@ -50,6 +51,7 @@ library
         Language.Atom.Language
         Language.Atom.Scheduling
         Language.Atom.Unit
+        Language.Atom.UeMap
 
     extensions: GADTs, DeriveDataTypeable
 

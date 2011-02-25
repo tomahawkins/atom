@@ -8,19 +8,20 @@ import Language.Atom.Expressions
 import Language.Atom.UeMap
 
 -- | Topologically sorts a list of expressions and subexpressions.
-topo :: [UE] -> [(UE, String)]
-topo ues = reverse ues'
+topo :: UeMap -> [Hash] -> [(Hash, String)]
+topo mp ues = reverse ues'
   where
   start = 0
   (_, ues') = foldl collect (start, []) ues
-  collect :: (Int, [(UE, String)]) -> UE -> (Int, [(UE, String)])
+  collect :: (Int, [(Hash, String)]) -> Hash -> (Int, [(Hash, String)])
   collect (n, ues) ue | any ((== ue) . fst) ues = (n, ues)
-  collect (n, ues) ue = (n' + 1, (ue, e n') : ues') where (n', ues') = foldl collect (n, ues) $ ueUpstream ue
+  collect (n, ues) ue = (n' + 1, (ue, e n') : ues') 
+    where (n', ues') = foldl collect (n, ues) $ ueUpstream ue mp
 
 e :: Int -> String
 e i = "__" ++ show i
 
 -- | Number of UE's computed in rule.
-ruleComplexity :: Rule -> Int
-ruleComplexity = length . topo . allUEs
+ruleComplexity :: UeMap -> Rule -> Int
+ruleComplexity mp = length . (topo mp) . allUEs
 

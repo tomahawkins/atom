@@ -5,17 +5,19 @@ module Language.Atom.Scheduling
   , reportSchedule
   ) where
 
+import Text.Printf
 import Data.List
+
 import Language.Atom.Analysis
 import Language.Atom.Elaboration
-import Text.Printf
+import Language.Atom.UeMap
 
-type Schedule = [(Int, Int, [Rule])]  -- (period, phase, rules)
+type Schedule = (UeMap, [(Int, Int, [Rule])])  -- (period, phase, rules)
 
-schedule :: [Rule] -> Schedule
-schedule rules' = concatMap spread periods
+schedule :: [Rule] -> UeMap -> Schedule
+schedule rules' mp = (mp, concatMap spread periods)
   where
-  rules = [ r | r@(Rule _ _ _ _ _ _ _ _) <- rules' ]
+  rules = [ r | r@(Rule _ _ _ _ _ _ _) <- rules' ]
 
   -- Algorithm for assigning rules to phases for a given period 
   -- (assuming they aren't given an exact phase):
@@ -42,7 +44,7 @@ schedule rules' = concatMap spread periods
     -- C. The sum of the difference between between each rule's offset and it's
     -- scheduled phase is the minimum of all schedules satisfying (A) and (B).
     
-  spread :: (Int, [Rule]) -> Schedule
+  spread :: (Int, [Rule]) -> [(Int, Int, [Rule])]
   spread (period, rules) = 
     placeRules (placeExactRules (replicate period []) exactRules)
                orderedByPhase
@@ -88,32 +90,30 @@ schedule rules' = concatMap spread periods
   grow ((a, bs):rest) (a', b) | a' == a   = (a, b : bs) : rest
                               | otherwise = (a, bs) : grow rest (a', b)
 
-
-
 reportSchedule :: Schedule -> String
-reportSchedule schedule = concat
+reportSchedule (mp, schedule) = concat
   [ "Rule Scheduling Report\n\n"
   , "Period  Phase  Exprs  Rule\n"
   , "------  -----  -----  ----\n"
-  , concatMap reportPeriod schedule
+  , concatMap (reportPeriod mp) schedule
   , "               -----\n"
-  , printf "               %5i\n" $ sum $ map ruleComplexity rules
+  , printf "               %5i\n" $ sum $ map (ruleComplexity mp) rules
   , "\n"
   , "Hierarchical Expression Count\n\n"
   , "  Total   Local     Rule\n"
   , "  ------  ------    ----\n"
-  , reportUsage "" $ usage rules
+  , reportUsage "" $ usage mp rules
   , "\n"
   ]
   where
   rules = concat $ [ r | (_, _, r) <- schedule ]
 
 
-reportPeriod :: (Int, Int, [Rule]) -> String
-reportPeriod (period, phase, rules) = concatMap reportRule rules
+reportPeriod :: UeMap -> (Int, Int, [Rule]) -> String
+reportPeriod mp (period, phase, rules) = concatMap reportRule rules
   where
   reportRule :: Rule -> String
-  reportRule rule = printf "%6i  %5i  %5i  %s\n" period phase (ruleComplexity rule) (show rule)
+  reportRule rule = printf "%6i  %5i  %5i  %s\n" period phase (ruleComplexity mp rule) (show rule)
 
 
 data Usage = Usage String Int [Usage] deriving Eq
@@ -126,15 +126,15 @@ reportUsage i node@(Usage name n subs) = printf "  %6i  %6i    %s\n" (totalCompl
 totalComplexity :: Usage -> Int
 totalComplexity (Usage _ n subs) = n + sum (map totalComplexity subs)
 
-usage :: [Rule] -> Usage
-usage = head . foldl insertUsage [] . map usage'
+usage :: UeMap -> [Rule] -> Usage
+usage mp = head . foldl insertUsage [] . map (usage' mp)
 
-usage' :: Rule -> Usage
-usage' rule = f $ split $ ruleName rule
+usage' :: UeMap -> Rule -> Usage
+usage' mp rule = f $ split $ ruleName rule
   where
   f :: [String] -> Usage
   f [] = undefined
-  f [name] = Usage name (ruleComplexity rule) []
+  f [name] = Usage name (ruleComplexity mp rule) []
   f (name:names) = Usage name 0 [f names]
 
 split :: String -> [String]

@@ -142,7 +142,7 @@ type UeState a = State UeMap a
 getUE :: Hash -> UeMap -> UeElem
 getUE h (_,mp) = 
   case M.lookup h mp of
-    Nothing -> error $ "Error looking up hash " ++ show h ++ " in the UE map."
+    Nothing -> error $ "Error looking up hash " ++ show h ++ " in the UE map\n" ++ show mp
     Just e -> e
 
 -- | Put a new 'UE' in the map, unless it's already in there, and return the
@@ -155,8 +155,7 @@ emptyMap = (0, M.empty)
 
 -- | Create the sharing map.
 share :: UE -> UeState Hash
-share e = 
-  case e of 
+share e = case e of 
   UVRef (UV i j k) -> maybeUpdate (MUVRef $ MUV i j k)
   UVRef (UVExtern i j) -> maybeUpdate (MUVRef $ MUVExtern i j)
   UVRef (UVArray arr a) -> unOp a (\x -> MUVRef (MUVArray arr x))

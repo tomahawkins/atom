@@ -79,7 +79,7 @@ data Rule
     , ruleActions   :: [([String] -> String, [Hash])]
     , rulePeriod    :: Int
     , rulePhase     :: Phase
-    , mathH         :: Bool -- Contains a math.h call?
+--    , mathH         :: Bool -- Contains a math.h call?
     }
   | Assert
     { ruleName      :: Name
@@ -114,17 +114,16 @@ elaborateRules parentEnable atom =
   enable :: UeState Hash
   enable = do
     st <- S.get
-    let (h,st') =  newUE (uand (recoverUE st parentEnable)
-                               (recoverUE st (atomEnable atom)))
+    let (h,st') = newUE (uand (recoverUE st parentEnable)
+                              (recoverUE st (atomEnable atom)))
                          st
     S.put st'
     return h
   rule :: UeState Rule
   rule = do 
     h <- enable 
-    assigns <- S.foldM (\prs pr -> do pr' <- enableAssign pr
+    assigns <- S.foldM (\prs pr -> do pr' <- enableAssign pr                                      
                                       return $ pr' : prs) [] (atomAssigns atom)
-    r <- rule
     st <- S.get
     return $ Rule
       { ruleId        = atomId   atom
@@ -134,7 +133,6 @@ elaborateRules parentEnable atom =
       , ruleActions   = atomActions atom
       , rulePeriod    = atomPeriod  atom
       , rulePhase     = atomPhase   atom
-      , mathH         = any isMathHCall (map (flip getUE st) (allUEs r))
       }
   assert :: (Name, Hash) -> UeState Rule
   assert (name, ue) = do 
@@ -168,8 +166,8 @@ elaborateRules parentEnable atom =
   enableAssign :: (MUV, Hash) -> UeState (MUV, Hash)
   enableAssign (uv, ue) = do 
     e <- enable
-    st <- S.get 
     h <- maybeUpdate (MUVRef uv)
+    st <- S.get 
     let (h',st') = newUE (umux (recoverUE st e) 
                                (recoverUE st ue) 
                                (recoverUE st h))
@@ -180,7 +178,7 @@ elaborateRules parentEnable atom =
 reIdRules :: Int -> [Rule] -> [Rule]
 reIdRules _ [] = []
 reIdRules i (a:b) = case a of
-  Rule _ _ _ _ _ _ _ _ -> a { ruleId = i } : reIdRules (i + 1) b
+  Rule _ _ _ _ _ _ _ -> a { ruleId = i } : reIdRules (i + 1) b
   _                    -> a                : reIdRules  i      b
 
 buildAtom :: UeMap -> Global -> Name -> Atom a -> IO (a, AtomSt)
@@ -253,11 +251,11 @@ elaborate st name atom = do
                                        name atom 
   let (h,st1) = newUE (ubool True) st0
       (getRules,st2) = S.runState (elaborateRules h atomDB) st1
-      rules = reIdRules 0 getRules
+      rules = reIdRules 0 (reverse getRules)
       coverageNames  = [ name | Cover  name _ _ <- rules ]
       assertionNames = [ name | Assert name _ _ <- rules ]
       probeNames = [ (n, typeOf a st2) | (n, a) <- gProbes g ]
-  if (null rules)
+  if (null rules) 
     then do
       putStrLn "ERROR: Design contains no rules.  Nothing to do."
       return Nothing
@@ -265,7 +263,7 @@ elaborate st name atom = do
       mapM_ (checkEnable st) rules
       ok <- mapM checkAssignConflicts rules
       return (if and ok 
-                then Just (st2
+                then Just ( st2
                           , (trimState $ StateHierarchy name 
                               $ gState g, rules, assertionNames
                                   , coverageNames, probeNames))
@@ -290,7 +288,7 @@ checkEnable st rule
 -- | Check that a variable is assigned more than once in a rule.  Will
 -- eventually be replaced consistent assignment checking.
 checkAssignConflicts :: Rule -> IO Bool
-checkAssignConflicts rule@(Rule _ _ _ _ _ _ _ _) =
+checkAssignConflicts rule@(Rule _ _ _ _ _ _ _) = 
   if length vars /= length vars'
     then do
       putStrLn $ "ERROR: Rule " 
@@ -408,7 +406,7 @@ ruleGraph name rules uvs = do
 allUVs :: UeMap -> [Rule] -> Hash -> [MUV]
 allUVs st rules ue = fixedpoint next $ nearestUVs ue st
   where
-  assigns = concat [ ruleAssigns r | r@(Rule _ _ _ _ _ _ _ _) <- rules ]
+  assigns = concat [ ruleAssigns r | r@(Rule _ _ _ _ _ _ _) <- rules ]
   previousUVs :: MUV -> [MUV]
   previousUVs uv = concat [ nearestUVs ue st | (uv', ue) <- assigns, uv == uv' ]
   next :: [MUV] -> [MUV]
@@ -426,7 +424,7 @@ allUEs rule = ruleEnable rule : ues
   index (MUVArray _ ue) = [ue]
   index _ = []
   ues = case rule of
-    Rule _ _ _ _ _ _ _ _ -> 
+    Rule _ _ _ _ _ _ _ -> 
          concat [ ue : index uv | (uv, ue) <- ruleAssigns rule ] 
       ++ concat (snd (unzip (ruleActions rule)))
     Assert _ _ a       -> [a]

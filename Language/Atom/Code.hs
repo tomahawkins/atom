@@ -13,11 +13,13 @@ import Data.List
 import Data.Maybe
 import Text.Printf
 import Data.Word
+import qualified Data.IntMap as M
 
 import Language.Atom.Analysis
 import Language.Atom.Elaboration
-import Language.Atom.Expressions
-import Language.Atom.Scheduling
+import Language.Atom.Expressions hiding (typeOf)
+import qualified Language.Atom.Expressions as E
+import Language.Atom.Scheduling 
 import Language.Atom.UeMap
 
 -- | C code configuration parameters.
@@ -113,130 +115,75 @@ cType t = case t of
   Float  -> "float"
   Double -> "double"
 
-codeUE :: Config -> UeMap -> String -> UeMap -> String
-codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ basic ++ ";\n"
+codeUE :: UeMap -> Config -> [(Hash, String)] -> String -> (Hash, String) -> String
+codeUE mp config ues d (ue, n) = 
+  d ++ cType (typeOf ue mp) ++ " " ++ n ++ " = " ++ basic ++ ";\n"
   where
-  operands = map (fromJust . flip lookup ues) $ ueUpstream ue
+  operands = map (fromJust . flip lookup ues) $ ueUpstream ue mp
   basic :: String
-  basic = concat $ case ue of
-    UVRef (UV _ n _)                 -> [cStateName config, ".", n]
-    UVRef (UVArray (UA _ n _) _)     -> [cStateName config, ".", n, "[", a, "]"]
-    UVRef (UVArray (UAExtern n _) _) -> [n, "[", a, "]"]
-    UVRef (UVExtern n _)             -> [n]
-    UCast _ _            -> ["(", cType (typeOf ue), ") ", a]
-    UConst c             -> [showConst c]
-    UAdd _ _             -> [a, " + ", b]
-    USub _ _             -> [a, " - ", b]
-    UMul _ _             -> [a, " * ", b]
-    UDiv _ _             -> [a, " / ", b]
-    UMod _ _             -> [a, " % ", b]
-    UNot _               -> ["! ", a]
-    UAnd _               -> intersperse " && " operands
-    UBWNot _             -> ["~ ", a]
-    UBWAnd _ _           -> [a, " & ", b]
-    UBWOr  _ _           -> [a, " | ", b]
-    UShift _ n           -> (if n >= 0 then [a, " << ", show n] else [a, " >> ", show (negate n)])
-    UEq  _ _             -> [a, " == ", b]
-    ULt  _ _             -> [a, " < " , b]
-    UMux _ _ _           -> [a, " ? " , b, " : ", c]
-    UF2B _               -> ["*((", ct Word32, " *) &(", a, "))"]
-    UD2B _               -> ["*((", ct Word64, " *) &(", a, "))"]
-    UB2F _               -> ["*((", ct Float , " *) &(", a, "))"]
-    UB2D _               -> ["*((", ct Double, " *) &(", a, "))"]
+  basic = concat $ case getUE ue mp of
+    MUVRef (MUV _ n _)                 -> [cStateName config, ".", n]
+    MUVRef (MUVArray (UA _ n _) _)     -> [cStateName config, ".", n, "[", a, "]"]
+    MUVRef (MUVArray (UAExtern n _) _) -> [n, "[", a, "]"]
+    MUVRef (MUVExtern n _)             -> [n]
+    MUCast _ _            -> ["(", cType (typeOf ue mp), ") ", a]
+    MUConst c             -> [showConst c]
+    MUAdd _ _             -> [a, " + ", b]
+    MUSub _ _             -> [a, " - ", b]
+    MUMul _ _             -> [a, " * ", b]
+    MUDiv _ _             -> [a, " / ", b]
+    MUMod _ _             -> [a, " % ", b]
+    MUNot _               -> ["! ", a]
+    MUAnd _               -> intersperse " && " operands
+    MUBWNot _             -> ["~ ", a]
+    MUBWAnd _ _           -> [a, " & ", b]
+    MUBWOr  _ _           -> [a, " | ", b]
+    MUShift _ n           -> (if n >= 0 then [a, " << ", show n] else [a, " >> ", show (negate n)])
+    MUEq  _ _             -> [a, " == ", b]
+    MULt  _ _             -> [a, " < " , b]
+    MUMux _ _ _           -> [a, " ? " , b, " : ", c]
+    MUF2B _               -> ["*((", ct Word32, " *) &(", a, "))"]
+    MUD2B _               -> ["*((", ct Word64, " *) &(", a, "))"]
+    MUB2F _               -> ["*((", ct Float , " *) &(", a, "))"]
+    MUB2D _               -> ["*((", ct Double, " *) &(", a, "))"]
 -- math.h:
-    UPi                  -> [ "M_PI" ]
-    UExp   _             -> [ "exp",   f, " ( ", a, " )"]
-    ULog   _             -> [ "log",   f, " ( ", a, " )"]
-    USqrt  _             -> [ "sqrt",  f, " ( ", a, " )"]
-    UPow   _ _           -> [ "pow",   f, " ( ", a, ", ", b, " )"]
-    USin   _             -> [ "sin",   f, " ( ", a, " )"]
-    UAsin  _             -> [ "asin",  f, " ( ", a, " )"]
-    UCos   _             -> [ "cos",   f, " ( ", a, " )"]
-    UAcos  _             -> [ "acos",  f, " ( ", a, " )"]
-    USinh  _             -> [ "sinh",  f, " ( ", a, " )"]
-    UCosh  _             -> [ "cosh",  f, " ( ", a, " )"]
-    UAsinh _             -> [ "asinh", f, " ( ", a, " )"]
-    UAcosh _             -> [ "acosh", f, " ( ", a, " )"]
-    UAtan  _             -> [ "atan",  f, " ( ", a, " )"]
-    UAtanh _             -> [ "atanh", f, " ( ", a, " )"]
+    MUPi                  -> [ "M_PI" ]
+    MUExp   _             -> [ "exp",   f, " ( ", a, " )"]
+    MULog   _             -> [ "log",   f, " ( ", a, " )"]
+    MUSqrt  _             -> [ "sqrt",  f, " ( ", a, " )"]
+    MUPow   _ _           -> [ "pow",   f, " ( ", a, ", ", b, " )"]
+    MUSin   _             -> [ "sin",   f, " ( ", a, " )"]
+    MUAsin  _             -> [ "asin",  f, " ( ", a, " )"]
+    MUCos   _             -> [ "cos",   f, " ( ", a, " )"]
+    MUAcos  _             -> [ "acos",  f, " ( ", a, " )"]
+    MUSinh  _             -> [ "sinh",  f, " ( ", a, " )"]
+    MUCosh  _             -> [ "cosh",  f, " ( ", a, " )"]
+    MUAsinh _             -> [ "asinh", f, " ( ", a, " )"]
+    MUAcosh _             -> [ "acosh", f, " ( ", a, " )"]
+    MUAtan  _             -> [ "atan",  f, " ( ", a, " )"]
+    MUAtanh _             -> [ "atanh", f, " ( ", a, " )"]
     where
       ct = cType
       a = head operands
       b = operands !! 1
       c = operands !! 2
-      f = case ( typeOf ue ) of
+      f = case ( typeOf ue mp) of
             Float     -> "f"
             Double    -> ""
             _         -> error "unhandled float type"
 
--- codeUE :: Config -> [(UE, String)] -> String -> (UE, String) -> String
--- codeUE config ues d (ue, n) = d ++ cType (typeOf ue) ++ " " ++ n ++ " = " ++ basic operands ++ ";\n"
---   where
---   operands = map (fromJust . flip lookup ues) $ ueUpstream ue
---   basic :: [String] -> String
---   basic operands = concat $ case ue of
---     UVRef (UV _ n _)                 -> [cStateName config, ".", n]
---     UVRef (UVArray (UA _ n _) _)     -> [cStateName config, ".", n, "[", a, "]"]
---     UVRef (UVArray (UAExtern n _) _) -> [n, "[", a, "]"]
---     UVRef (UVExtern n _)             -> [n]
---     UCast _ _            -> ["(", cType (typeOf ue), ") ", a]
---     UConst c             -> [showConst c]
---     UAdd _ _             -> [a, " + ", b]
---     USub _ _             -> [a, " - ", b]
---     UMul _ _             -> [a, " * ", b]
---     UDiv _ _             -> [a, " / ", b]
---     UMod _ _             -> [a, " % ", b]
---     UNot _               -> ["! ", a]
---     UAnd _               -> intersperse " && " operands
---     UBWNot _             -> ["~ ", a]
---     UBWAnd _ _           -> [a, " & ", b]
---     UBWOr  _ _           -> [a, " | ", b]
---     UShift _ n           -> (if n >= 0 then [a, " << ", show n] else [a, " >> ", show (negate n)])
---     UEq  _ _             -> [a, " == ", b]
---     ULt  _ _             -> [a, " < " , b]
---     UMux _ _ _           -> [a, " ? " , b, " : ", c]
---     UF2B _               -> ["*((", ct Word32, " *) &(", a, "))"]
---     UD2B _               -> ["*((", ct Word64, " *) &(", a, "))"]
---     UB2F _               -> ["*((", ct Float , " *) &(", a, "))"]
---     UB2D _               -> ["*((", ct Double, " *) &(", a, "))"]
--- -- math.h:
---     UPi                  -> [ "M_PI" ]
---     UExp   _             -> [ "exp",   f, " ( ", a, " )"]
---     ULog   _             -> [ "log",   f, " ( ", a, " )"]
---     USqrt  _             -> [ "sqrt",  f, " ( ", a, " )"]
---     UPow   _ _           -> [ "pow",   f, " ( ", a, ", ", b, " )"]
---     USin   _             -> [ "sin",   f, " ( ", a, " )"]
---     UAsin  _             -> [ "asin",  f, " ( ", a, " )"]
---     UCos   _             -> [ "cos",   f, " ( ", a, " )"]
---     UAcos  _             -> [ "acos",  f, " ( ", a, " )"]
---     USinh  _             -> [ "sinh",  f, " ( ", a, " )"]
---     UCosh  _             -> [ "cosh",  f, " ( ", a, " )"]
---     UAsinh _             -> [ "asinh", f, " ( ", a, " )"]
---     UAcosh _             -> [ "acosh", f, " ( ", a, " )"]
---     UAtan  _             -> [ "atan",  f, " ( ", a, " )"]
---     UAtanh _             -> [ "atanh", f, " ( ", a, " )"]
---     where
---       ct = cType
---       a = head operands
---       b = operands !! 1
---       c = operands !! 2
---       f = case ( typeOf ue ) of
---             Float     -> "f"
---             Double    -> ""
---             _         -> error "unhandled float type"
-
 type RuleCoverage = [(Name, Int, Int)]
 
-containMathHFunctions :: [Rule] -> Bool
-containMathHFunctions rules = 
-  any math rules
-  where math rule = case rule of
-                      Rule _ _ _ _ _ _ _ b -> b
-                      _                    -> False
+-- containMathHFunctions :: [Rule] -> Bool
+-- containMathHFunctions rules = 
+--   any math rules
+--   where math rule = case rule of
+--                       Rule _ _ _ _ _ _ _ b -> b
+--                       _                    -> False
 
 writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] 
-       -> [Name] -> [(Name, Type)] -> UeStateT IO RuleCoverage
-writeC name config state rules schedule assertionNames coverageNames probeNames = do
+       -> [Name] -> [(Name, Type)] -> IO RuleCoverage
+writeC name config state rules (mp, schedule) assertionNames coverageNames probeNames = do
   writeFile (name ++ ".c") c
   writeFile (name ++ ".h") h
   return [ (ruleName r, div (ruleId r) 32, mod (ruleId r) 32) | r <- rules' ]
@@ -245,7 +192,8 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
   c = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
-    , codeIf ( containMathHFunctions rules ) "#include <math.h>"
+    , codeIf (M.fold (\e ans -> isMathHCall e || ans ) False (snd mp)) 
+             "#include <math.h>"
     , ""
     , preCode
     , ""
@@ -255,10 +203,11 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , codeIf (cRuleCoverage config) $ "static " ++ cType Word32 
                  ++ " __coverage[" ++ show covLen ++ "] = {" 
                  ++ (concat $ intersperse ", " $ replicate covLen "0") ++ "};"
-    , codeIf (cRuleCoverage config) $ "static " ++ cType Word32 ++ " __coverage_index = 0;"
-    , declState True $ StateHierarchy (cStateName config) [state]
-    , concatMap (codeRule config) rules'
-    , codeAssertionChecks config assertionNames coverageNames rules
+    , codeIf (cRuleCoverage config) 
+             ("static " ++ cType Word32 ++ " __coverage_index = 0;")
+    , declState True (StateHierarchy (cStateName config) [state])
+    , concatMap (codeRule mp config) rules'
+    , codeAssertionChecks mp config assertionNames coverageNames rules
     , "void " ++ funcName ++ "() {"
     , swOrHwClock
     , "}"
@@ -356,7 +305,7 @@ writeC name config state rules schedule assertionNames coverageNames probeNames 
     , ""
     , "void " ++ funcName ++ "();"
     , ""
-    , declState False $ StateHierarchy (cStateName config) [state]
+    , declState False (StateHierarchy (cStateName config) [state])
     ]
 
   globalType = cType (case hardwareClock config of
@@ -384,62 +333,80 @@ codeIf :: Bool -> String -> String
 codeIf a b = if a then b else ""
 
 declState :: Bool -> StateHierarchy -> String
-declState define a = (if define then "" else "extern ") ++ init (init (f1 "" a)) ++ (if define then " =\n" ++ f2 "" a else "") ++ ";\n"
+declState define a = 
+     (if define then "" else "extern ") ++ init (init (f1 "" a)) 
+  ++ (if define then " =\n" ++ f2 "" a else "") ++ ";\n"
   where
   f1 i a = case a of
-    StateHierarchy name items -> i ++ "struct {  /* " ++ name ++ " */\n" ++ concatMap (f1 ("  " ++ i)) items ++ i ++ "} " ++ name ++ ";\n"
-    StateVariable  name c     -> i ++ cType (typeOf c) ++ " " ++ name ++ ";\n"
-    StateArray     name c     -> i ++ cType (typeOf $ head c) ++ " " ++ name ++ "[" ++ show (length c) ++ "];\n"
+    StateHierarchy name items -> 
+         i ++ "struct {  /* " ++ name ++ " */\n" 
+      ++ concatMap (f1 ("  " ++ i)) items ++ i ++ "} " ++ name ++ ";\n"
+    StateVariable  name c     -> i ++ cType (E.typeOf c) ++ " " ++ name ++ ";\n"
+    StateArray     name c     -> 
+      i ++ cType (E.typeOf $ head c) ++ " " ++ name ++ "[" ++ show (length c) ++ "];\n"
 
   f2 i a = case a of
-    StateHierarchy name items -> i ++ "{  /* " ++ name ++ " */\n" ++ intercalate ",\n" (map (f2 ("  " ++ i)) items) ++ "\n" ++ i ++ "}"
+    StateHierarchy name items -> 
+         i ++ "{  /* " ++ name ++ " */\n" 
+      ++ intercalate ",\n" (map (f2 ("  " ++ i)) items) ++ "\n" ++ i ++ "}"
     StateVariable  name c     -> i ++ "/* " ++ name ++ " */  " ++ showConst c
-    StateArray     name c     -> i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ " ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
+    StateArray     name c     -> 
+         i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ " 
+      ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
 
-codeRule :: Config -> Rule -> String
-codeRule config rule@(Rule _ _ _ _ _ _ _ _) =
+codeRule :: UeMap -> Config -> Rule -> String
+codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
   "/* " ++ show rule ++ " */\n" ++
   "static void __r" ++ show (ruleId rule) ++ "() {\n" ++
-  concatMap (codeUE config ues "  ") ues ++
+  concatMap (codeUE mp config ues "  ") ues ++
   "  if (" ++ id (ruleEnable rule) ++ ") {\n" ++
   concatMap codeAction (ruleActions rule) ++
-  codeIf (cRuleCoverage config) ("    __coverage[" ++ covWord ++ "] = __coverage[" ++ covWord ++ "] | (1 << " ++ covBit ++ ");\n") ++
-  "  }\n" ++
-  concatMap codeAssign (ruleAssigns rule) ++
-  "}\n\n"
+  codeIf (cRuleCoverage config) 
+         ( "    __coverage[" ++ covWord ++ "] = __coverage[" ++ covWord 
+          ++ "] | (1 << " ++ covBit ++ ");\n") 
+  ++ "  }\n" ++ concatMap codeAssign (ruleAssigns rule) ++ "}\n\n"
   where
-  ues = topo $ allUEs rule
+  ues = topo mp $ allUEs rule
   id ue = fromJust $ lookup ue ues
 
-  codeAction :: (([String] -> String), [UE]) -> String
+  codeAction :: (([String] -> String), [Hash]) -> String
   codeAction (f, args) = "    " ++ f (map id args) ++ ";\n"
 
   covWord = show $ div (ruleId rule) 32
   covBit  = show $ mod (ruleId rule) 32
 
-  codeAssign :: (UV, UE) -> String
+  codeAssign :: (MUV, Hash) -> String
   codeAssign (uv, ue) = concat ["  ", lh, " = ", id ue, ";\n"]
     where
     lh = case uv of
-      UV _ n _                     -> concat [cStateName config, ".", n]
-      UVArray (UA _ n _)     index -> concat [cStateName config, ".", n, "[", id index, "]"]
-      UVArray (UAExtern n _) index -> concat [n, "[", id index, "]"]
-      UVExtern n _                 -> n
+      MUV _ n _                     -> concat [cStateName config, ".", n]
+      MUVArray (UA _ n _)     index -> 
+        concat [cStateName config, ".", n, "[", id index, "]"]
+      MUVArray (UAExtern n _) index -> concat [n, "[", id index, "]"]
+      MUVExtern n _                 -> n
 
-codeRule _ _ = ""
+codeRule _ _ _ = ""
 
 globalClk :: String
 globalClk = "__global_clock"
 
-codeAssertionChecks :: Config -> [Name] -> [Name] -> [Rule] -> String
-codeAssertionChecks config assertionNames coverageNames rules = codeIf (cAssert config) $
+codeAssertionChecks :: UeMap -> Config -> [Name] -> [Name] -> [Rule] -> String
+codeAssertionChecks mp config assertionNames coverageNames rules = 
+  codeIf (cAssert config) $
   "static void __assertion_checks() {\n" ++
-  concatMap (codeUE config ues "  ") ues ++
-  concat [ "  if (" ++ id enable ++ ") " ++ cAssertName config ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", " ++ globalClk ++ ");\n" | Assert name enable check <- rules ] ++
-  concat [ "  if (" ++ id enable ++ ") " ++ cCoverName  config ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", " ++ globalClk ++ ");\n" | Cover  name enable check <- rules ] ++
+  concatMap (codeUE mp config ues "  ") ues ++
+  concat [     "  if (" ++ id enable ++ ") " ++ cAssertName config 
+            ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", " 
+            ++ globalClk ++ ");\n"                                 
+          | Assert name enable check <- rules ] ++
+  concat [     "  if (" ++ id enable ++ ") " ++ cCoverName  config 
+            ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", " 
+            ++ globalClk ++ ");\n"                                 
+          | Cover  name enable check <- rules ] ++
   "}\n\n"
   where
-  ues = topo $ concat [ [a, b] | Assert _ a b <- rules ] ++ concat [ [a, b] | Cover _ a b <- rules ]
+  ues = topo mp $    concat [ [a, b] | Assert _ a b <- rules ] 
+                  ++ concat [ [a, b] | Cover _ a b <- rules ]
   id ue = fromJust $ lookup ue ues
   assertionId :: Name -> String
   assertionId name = show $ fromJust $ elemIndex name assertionNames
