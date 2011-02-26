@@ -20,7 +20,7 @@ module Language.Atom.UeMap
   , isMathHCall
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import qualified Data.IntMap as M
 import Data.Maybe
 import Data.List (nub)
@@ -48,43 +48,43 @@ newUV uv mp =
 
 -- | Corresponds to 'UE's --- the elements in the sharing structure.
 data UeElem
-  = MUVRef MUV
-  | MUConst Const
-  | MUCast  Type Hash
-  | MUAdd   Hash Hash
-  | MUSub   Hash Hash
-  | MUMul   Hash Hash
-  | MUDiv   Hash Hash
-  | MUMod   Hash Hash
-  | MUNot   Hash
+  = MUVRef !MUV
+  | MUConst !Const
+  | MUCast  !Type !Hash
+  | MUAdd   !Hash !Hash
+  | MUSub   !Hash !Hash
+  | MUMul   !Hash !Hash
+  | MUDiv   !Hash !Hash
+  | MUMod   !Hash !Hash
+  | MUNot   !Hash
   | MUAnd   [Hash]
-  | MUBWNot Hash
-  | MUBWAnd Hash Hash
-  | MUBWOr  Hash Hash
-  | MUShift Hash Int
-  | MUEq    Hash Hash
-  | MULt    Hash Hash
-  | MUMux   Hash Hash Hash
-  | MUF2B   Hash
-  | MUD2B   Hash
-  | MUB2F   Hash
-  | MUB2D   Hash
+  | MUBWNot !Hash
+  | MUBWAnd !Hash !Hash
+  | MUBWOr  !Hash !Hash
+  | MUShift !Hash !Int
+  | MUEq    !Hash !Hash
+  | MULt    !Hash !Hash
+  | MUMux   !Hash !Hash !Hash
+  | MUF2B   !Hash
+  | MUD2B   !Hash
+  | MUB2F   !Hash
+  | MUB2D   !Hash
 -- math.h:
   | MUPi
-  | MUExp   Hash
-  | MULog   Hash
-  | MUSqrt  Hash
-  | MUPow   Hash Hash
-  | MUSin   Hash
-  | MUAsin  Hash
-  | MUCos   Hash
-  | MUAcos  Hash
-  | MUSinh  Hash
-  | MUCosh  Hash
-  | MUAsinh Hash
-  | MUAcosh Hash
-  | MUAtan  Hash
-  | MUAtanh Hash
+  | MUExp   !Hash
+  | MULog   !Hash
+  | MUSqrt  !Hash
+  | MUPow   !Hash !Hash
+  | MUSin   !Hash
+  | MUAsin  !Hash
+  | MUCos   !Hash
+  | MUAcos  !Hash
+  | MUSinh  !Hash
+  | MUCosh  !Hash
+  | MUAsinh !Hash
+  | MUAcosh !Hash
+  | MUAtan  !Hash
+  | MUAtanh !Hash
   deriving (Show, Eq, Ord)
 
 typeOf :: Hash -> UeMap -> Type
@@ -211,7 +211,7 @@ binOp (e0,e1) code = do
 
 triOp :: (UE, UE, UE) -> (Hash -> Hash -> Hash -> UeElem) -> UeState Hash
 triOp (e0,e1,e2) code = do
-  h0 <- share e0  
+  h0 <- share e0   
   h1 <- share e1  
   h2 <- share e2  
   maybeUpdate (code h0 h1 h2)
@@ -227,24 +227,34 @@ listOp es code = do
 -- its hash value.  Otherwise, update the map and return the new hash value
 -- for the inserted element.
 maybeUpdate :: UeElem -> UeState Hash
-maybeUpdate code = do
+maybeUpdate e = do
   st <- get
-  case getHash code (snd st) of
-    Nothing -> update code st
+--  case getHash e (snd st) of
+  case getHash e (M.assocs $ snd st) of
+    Nothing -> update e st
     Just h -> return h
   where
   -- Update the map.
   update :: UeElem -> UeMap -> UeState Hash
-  update code st = do let hash = fst st + 1
-                      put (hash, M.insert hash code (snd st))
-                      return hash
-  -- Lookup a hash value, returning 'Nothing' if no hash exists in the map and
-  -- 'Just' the hash value otherwise.
-  getHash :: UeElem -> M.IntMap UeElem -> Maybe Hash
-  getHash e st = 
-    M.foldWithKey (\k code m -> if isJust m then m
-                                  else if e == code then Just k
-                                         else Nothing) Nothing st
+  update e st = do let hash = fst st + 1
+                   put (hash, M.insert hash e (snd st))
+                   return hash
+
+-- Lookup an elem, returning 'Nothing' if no hash exists in the map and 'Just'
+-- the hash value otherwise.
+getHash :: UeElem -> [(Hash, UeElem)] -> Maybe Hash
+getHash e [] = Nothing
+getHash e ((k,e'):_) | e == e' = Just k
+getHash e (_:es) | otherwise = getHash e es
+
+  -- M.foldWithKey (\k code m -> if isJust m then m
+  --                               else if e == code then Just k
+  --                                      else Nothing) Nothing st
+-- getHash :: UeElem -> M.IntMap UeElem -> Maybe Hash
+-- getHash e st = 
+--   M.foldWithKey (\k code m -> if isJust m then m
+--                                 else if e == code then Just k
+--                                        else Nothing) Nothing st
 
 -- | Get a 'UE' back out of the 'UeMap'.
 recoverUE :: UeMap -> Hash -> UE

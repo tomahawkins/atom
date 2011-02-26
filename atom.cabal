@@ -34,7 +34,7 @@ extra-source-files:
 library
     build-depends:
         base       >= 4.0     && < 5,
-        mtl        >= 1.1.0.1 && < 1.2,
+        mtl        >= 1.1.0.1,
         process    >= 1.0.1.1 && < 1.2,
         syb        >= 0.1.0.0,
         containers >= 0.4
@@ -56,8 +56,8 @@ library
     extensions: GADTs, DeriveDataTypeable
 
     if impl(ghc > 6.8)
-          ghc-options: -fwarn-tabs
-    ghc-options:       -W
+          ghc-options: -fwarn-tabs -O2
+    ghc-options:       -W -O2
 
 source-repository head
     type:     git

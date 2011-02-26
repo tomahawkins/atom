@@ -105,7 +105,7 @@ period n atom = do
 -- | Returns the execution period of the current scope.
 getPeriod :: Atom Int
 getPeriod = do
-  (st, (g, _)) <- get
+  (_, (g, _)) <- get
   return $ gPeriod g
 
 phase' :: (Int -> Phase) -> Int -> Atom a -> Atom a
@@ -141,7 +141,7 @@ exactPhase n a = phase' ExactPhase n a
 -- | Returns the phase of the current scope.
 getPhase :: Atom Int
 getPhase = do
-  (st, (g, _)) <- get
+  (_, (g, _)) <- get
   return $ case gPhase g of
              MinPhase ph   -> ph
              ExactPhase ph -> ph
@@ -149,7 +149,7 @@ getPhase = do
 -- | Returns the current atom hierarchical path.
 path :: Atom String
 path = do
-  (st, (_, atom)) <- get
+  (_, (_, atom)) <- get
   return $ atomName atom
 
 -- | Local boolean variable declaration.
@@ -321,9 +321,10 @@ nextCoverage = do
   return (value $ word32' "__coverage_index", value $ word32' "__coverage[__coverage_index]")
 
 
--- | An assertions checks that an E Bool is true.  Assertions are checked between the execution of every rule.
---   Parent enabling conditions can disable assertions, but period and phase constraints do not.
---   Assertion names should be globally unique.
+-- | An assertions checks that an E Bool is true.  Assertions are checked
+-- between the execution of every rule.  Parent enabling conditions can
+-- disable assertions, but period and phase constraints do not.  Assertion
+-- names should be globally unique.
 assert :: Name -> E Bool -> Atom ()
 assert name check = do
   (st, (g, atom)) <- get

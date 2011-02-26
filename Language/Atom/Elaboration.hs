@@ -25,13 +25,11 @@ module Language.Atom.Elaboration
   , allUEs
   ) where
 
-import Debug.Trace
-
 import Control.Monad.Trans
 import Data.Function (on)
 import Data.List
 import Data.Char
-import qualified Control.Monad.State as S
+import qualified Control.Monad.State.Strict as S
 
 import Language.Atom.Expressions hiding (typeOf)
 import Language.Atom.UeMap
@@ -263,7 +261,7 @@ elaborate st name atom = do
       putStrLn "ERROR: Design contains no rules.  Nothing to do."
       return Nothing
     else do
-      mapM_ (checkEnable st) rules
+      mapM_ (checkEnable st2) rules
       ok <- mapM checkAssignConflicts rules
       return (if and ok 
                 then Just ( st2
@@ -285,7 +283,7 @@ trimState a = case a of
 -- | Checks that a rule will not be trivially disabled.
 checkEnable :: UeMap -> Rule -> IO ()
 checkEnable st rule 
-  | trace (show (ruleEnable rule) ++ ":" ++ show (fst $ newUE (ubool False) st) ) $ ruleEnable rule == (fst $ newUE (ubool False) st) = 
+  | ruleEnable rule == (fst $ newUE (ubool False) st) = 
       putStrLn $ "WARNING: Rule will never execute: " ++ show rule
   | otherwise                      = return ()
 
