@@ -21,7 +21,8 @@ module Language.Atom.UeMap
   ) where
 
 import Control.Monad.State.Strict
-import qualified Data.IntMap as M
+--import qualified Data.IntMap as M
+import qualified Data.Bimap as M
 import Data.Maybe
 import Data.List (nub)
 
@@ -132,7 +133,7 @@ typeOf h mp = case getUE h mp of
   typeOf' h' = typeOf h' mp
 
 -- | An entry in the Map.
-type UeMap = (Hash, M.IntMap UeElem)
+type UeMap = (Hash, M.Bimap Int UeElem)
 
 -- | Wrapped in the State Monad.
 type UeState a = State UeMap a
@@ -230,18 +231,21 @@ maybeUpdate :: UeElem -> UeState Hash
 maybeUpdate e = do
   st <- get
   let mp = snd st
-  case getHash e (M.toList mp) of
+  case M.lookupR e mp of
     Nothing -> do let hash = fst st + 1
                   put (hash, M.insert hash e mp)
                   return hash
     Just h -> return h
 
--- Lookup an elem, returning 'Nothing' if no hash exists in the map and 'Just'
--- the hash value otherwise.
-getHash :: UeElem -> [(Hash, UeElem)] -> Maybe Hash
-getHash e ((k,e'):_) | e == e' = Just k
-getHash e (_:es) | otherwise = getHash e es
-getHash _ [] = Nothing
+-- -- Lookup an elem, returning 'Nothing' if no hash exists in the map and 'Just'
+-- -- the hash value otherwise.
+-- getHash :: UeElem -> UeMap -> Maybe Hash
+-- getHash e mp = M.lookupR e
+
+
+-- ((k,e'):_) | e == e' = Just k
+-- getHash e (_:es) | otherwise = getHash e es
+-- getHash _ [] = Nothing
 
 -- | Get a 'UE' back out of the 'UeMap'.
 recoverUE :: UeMap -> Hash -> UE

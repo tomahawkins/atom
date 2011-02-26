@@ -13,7 +13,7 @@ import Data.List
 import Data.Maybe
 import Text.Printf
 import Data.Word
-import qualified Data.IntMap as M
+import qualified Data.Bimap as M
 
 import Language.Atom.Analysis
 import Language.Atom.Elaboration
@@ -192,7 +192,7 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
   c = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
-    , codeIf (M.fold (\e ans -> isMathHCall e || ans ) False (snd mp)) 
+    , codeIf (M.fold (\_ e ans -> isMathHCall e || ans ) False (snd mp)) 
              "#include <math.h>"
     , ""
     , preCode
