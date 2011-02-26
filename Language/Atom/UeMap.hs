@@ -229,31 +229,19 @@ listOp es code = do
 maybeUpdate :: UeElem -> UeState Hash
 maybeUpdate e = do
   st <- get
-  case getHash e (M.assocs $ snd st) of
-    Nothing -> update e st
+  let mp = snd st
+  case getHash e (M.toList mp) of
+    Nothing -> do let hash = fst st + 1
+                  put (hash, M.insert hash e mp)
+                  return hash
     Just h -> return h
-  where
-  -- Update the map.
-  update :: UeElem -> UeMap -> UeState Hash
-  update e st = do let hash = fst st + 1
-                   put (hash, M.insert hash e (snd st))
-                   return hash
 
 -- Lookup an elem, returning 'Nothing' if no hash exists in the map and 'Just'
 -- the hash value otherwise.
 getHash :: UeElem -> [(Hash, UeElem)] -> Maybe Hash
-getHash e [] = Nothing
 getHash e ((k,e'):_) | e == e' = Just k
 getHash e (_:es) | otherwise = getHash e es
-
-  -- M.foldWithKey (\k code m -> if isJust m then m
-  --                               else if e == code then Just k
-  --                                      else Nothing) Nothing st
--- getHash :: UeElem -> M.IntMap UeElem -> Maybe Hash
--- getHash e st = 
---   M.foldWithKey (\k code m -> if isJust m then m
---                                 else if e == code then Just k
---                                        else Nothing) Nothing st
+getHash _ [] = Nothing
 
 -- | Get a 'UE' back out of the 'UeMap'.
 recoverUE :: UeMap -> Hash -> UE
