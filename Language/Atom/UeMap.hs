@@ -229,7 +229,6 @@ listOp es code = do
 maybeUpdate :: UeElem -> UeState Hash
 maybeUpdate e = do
   st <- get
---  case getHash e (snd st) of
   case getHash e (M.assocs $ snd st) of
     Nothing -> update e st
     Just h -> return h
