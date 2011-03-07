@@ -45,7 +45,7 @@ data Config = Config
   }
 
 -- | Data associated with sampling a hardware clock.  For the clock to work
--- correctly, you MUST assign @__global_clock@ the current time (accoring to 
+-- correctly, you MUST assign @__global_clock@ the current time (accoring to
 -- @clockName@) the first time you enter the main Atom-generated function
 -- calling your rules.
 data Clock = Clock
@@ -55,7 +55,7 @@ data Clock = Clock
                                 -- @clockType clockName(void)@.
   , clockType  :: Type          -- ^ Clock type.  Assumed to be one of Word8,
                                 -- Word16, Word32, or Word64.  It is permissible
-                                -- for the clock to rollover.  
+                                -- for the clock to rollover.
   , delta      :: Integer       -- ^ Number of ticks in a phase.  Must be greater than 0.
   , delay      :: String        -- ^ C function to delay/sleep.  The function is
                                 -- assumed to have the prototype @void
@@ -181,7 +181,7 @@ type RuleCoverage = [(Name, Int, Int)]
 --                       Rule _ _ _ _ _ _ _ b -> b
 --                       _                    -> False
 
-writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name] 
+writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name]
        -> [Name] -> [(Name, Type)] -> IO RuleCoverage
 writeC name config state rules (mp, schedule) assertionNames coverageNames probeNames = do
   writeFile (name ++ ".c") c
@@ -198,10 +198,15 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
     , preCode
     , ""
     , "static " ++ globalType ++ " " ++ globalClk ++ " = 0;"
-    , codeIf (cRuleCoverage config) $ "static const " ++ cType Word32 
+    , ""
+    , case hardwareClock config of
+        Nothing -> ""
+        Just _  -> "static " ++ globalType ++ " " ++ phaseStartTime ++ ";"
+    , ""
+    , codeIf (cRuleCoverage config) $ "static const " ++ cType Word32
                  ++ " __coverage_len = " ++ show covLen ++ ";"
-    , codeIf (cRuleCoverage config) $ "static " ++ cType Word32 
-                 ++ " __coverage[" ++ show covLen ++ "] = {" 
+    , codeIf (cRuleCoverage config) $ "static " ++ cType Word32
+                 ++ " __coverage[" ++ show covLen ++ "] = {"
                  ++ (concat $ intersperse ", " $ replicate covLen "0") ++ "};"
     , codeIf (cRuleCoverage config) 
              ("static " ++ cType Word32 ++ " __coverage_index = 0;")
@@ -210,6 +215,10 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
     , codeAssertionChecks mp config assertionNames coverageNames rules
     , "void " ++ funcName ++ "() {"
     , swOrHwClock
+    , unlines [ swOrHwClock
+              , codePeriodPhases
+              , "  " ++ globalClk ++ " = " ++ globalClk ++ " + 1;"
+              ]
     , "}"
     , ""
     , postCode
@@ -217,32 +226,84 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
 
   codePeriodPhases = concatMap (codePeriodPhase config) schedule
 
-  swOrHwClock = 
+  swOrHwClock =
     case hardwareClock config of
-      Nothing      -> unlines [codePeriodPhases, "  " ++ globalClk ++ " = " ++ globalClk ++ " + 1;"]
-      Just clkData -> unlines 
+      Nothing      -> ""
+      Just clkData -> unlines
         [ ""
-        , codePeriodPhases
-        , "  // In the following we sample the hardware clock, waiting for the next phase."
-        , ""
         , "  " ++ declareConst phaseConst clkDelta
-        , "  " ++ declareConst maxConst maxVal
-        , "  " ++ globalType ++ " " ++ setTime
+        , "  " ++ declareConst maxConst   maxVal
+        , "  static " ++ globalType ++ " " ++ lastPhaseStartTime ++ ";"
+        , "  static " ++ globalType ++ " " ++ lastTime ++ ";"
+        , "  static bool __first_call = true;"
+        , "  " ++ globalType ++ " " ++ currentTime ++ ";"
         , ""
-        , errCheck 
-        , "  " ++ setTime ++ " // Update the current time."
-        , "  // Wait until the phase has expired.  If the current time hasn't"
-        , "  // overflowed, execute the first branch; otherwise, the second."
-        , "  if (" ++ currentTime ++ " >= " ++ globalClk ++ ") {"
-        , "    " ++ delayFn ++ "(" ++ phaseConst ++ " - (" ++ currentTime
-                   ++ " - " ++ globalClk ++ "));" 
-        , "  }"
-        , "  else {"
-        , "    " ++ delayFn ++ "(" ++ phaseConst ++ " - (" ++ currentTime ++ " + (" 
-                 ++ maxConst ++ " - " ++ globalClk ++ ")));"
+        , "  /* save the current time */"
+        , "  " ++ setTime
+        , ""
+        , "  /* initialize static variables on the first call */"
+        , "  if ( __first_call ) {"
+        , "    " ++ lastPhaseStartTime ++ " = " ++ phaseStartTime ++ ";"
+        , "    " ++ lastTime ++ " = " ++ currentTime ++ ";"
+        , "    __first_call = false;"
         , "  }"
         , ""
-        , "  " ++ setGlobalClk clkData
+        , "  /* wait for the amount left for the phase start time to be reached,"
+        , "     handle roll-overs of the system timer and the phase start time */"
+        , "  if ( " ++ phaseStartTime ++ " >= " ++ lastPhaseStartTime ++ " ) {"
+        , "    /* phase start time did not roll over */"
+        , "    if ( " ++ currentTime ++ " >= " ++ lastTime ++ " ) {"
+        , "      /* system time and the phase start time did not roll over */"
+        , "      if ( " ++ phaseStartTime ++ " >= " ++ currentTime ++ " ) {"
+        , "        " ++ delayFn ++ " ( " ++ phaseStartTime ++ " - " ++ currentTime ++ " );"
+        , "      } else {"
+        , "        /* we are late */"
+        , "        " ++ errHandler
+        , "      }"
+        , "    } else {"
+        , "      /* system time rolled over, the start time of the"
+        , "         phase did not, i.e. we are not late if currentTime"
+        , "         is already in between lastPhaseStartTime and phaseStartTime */"
+        , "      if ( ( " ++ currentTime ++ " >= " ++ lastPhaseStartTime ++ " )"
+        , "             && ( " ++ phaseStartTime ++ " >= " ++ currentTime ++ " ) ) {"
+        , "        " ++ delayFn ++ " ( " ++ phaseStartTime ++ " - " ++ currentTime ++ " );"
+        , "      } else {"
+        , "        /* we are late */"
+        , "        " ++ errHandler
+        , "      }"
+        , "    }"
+        , "  } else {"
+        , "    /* phase start time rolled over */"
+        , "    if ( " ++ currentTime ++ " >= " ++ lastTime ++ " ) {"
+        , "      /* current time did not yet roll over */"
+        , "      if ( " ++ currentTime ++ " >= " ++ phaseStartTime ++ " ) {"
+        , "        " ++ delayFn ++ " ( ( " ++ maxConst
+                         ++ " - ( " ++ currentTime
+                             ++ " - " ++ phaseStartTime ++ " ) + 1 )" ++ " );"
+        , "      } else {"
+        , "        /* this should not happen, since " ++ phaseConst ++ " should be"
+        , "           smaller than " ++ maxConst ++ " and " ++ lastTime ++ " should"
+        , "           be smaller than or equal to " ++ currentTime ++ " */"
+        , "        " ++ errHandler
+        , "      }"
+        , "    } else {"
+        , "      /* current time and phase start time rolled over"
+        , "         equal to the first case */"
+        , "      if ( " ++ phaseStartTime ++ " >= " ++ currentTime ++ " ) {"
+        , "        " ++ delayFn ++ " ( " ++ phaseStartTime ++ " - " ++ currentTime ++ " );"
+        , "      } else {"
+        , "        /* we are late */"
+        , "        " ++ errHandler
+        , "      }"
+        , "    }"
+        , "  }"
+        , ""
+        , ""
+        , "  /* update to the next phase start time */"
+        , "  " ++ lastPhaseStartTime ++ " = " ++ phaseStartTime ++ ";"
+        , "  " ++ phaseStartTime ++ " = " ++ phaseStartTime ++ " + "
+               ++ phaseConst ++ ";"
+        , "  " ++ lastTime ++ " = " ++ currentTime ++ ";"
         ]
         where
           delayFn = delay clkData
@@ -257,8 +318,9 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
                                    ++ " = " ++ showConst (constType c) ++ ";"
           setTime     = currentTime ++ " = " ++ clockName clkData ++ "();"
           maxConst    = "__max"
-          phaseConst = "__phase_len"
+          phaseConst  = "__phase_len"
           currentTime = "__curr_time"
+          lastTime    = "__last_time"
           clkDelta | d <= 0
                        = error $ "The delta "
                                  ++ show d
@@ -274,23 +336,10 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
                    | otherwise
                        = d
             where d = delta clkData
-          errCheck =
+          errHandler =
             case err clkData of
               Nothing    -> ""
-              Just errF  -> unlines
-                [ "  // An error check for when the phase has already expired."
-                , "  // The first disjunct is for when the current time has not overflowed,"
-                , "  // and the second for when it has."
-                , "  if (   ((" ++ currentTime ++ " >= " ++ globalClk ++ ") && (" 
-                                ++ currentTime ++ " - " ++ globalClk 
-                                ++ " > " ++ phaseConst ++ "))" 
-                , "      || (("
-                             ++ currentTime ++ " < " ++ globalClk ++ ") && ((" ++ maxConst 
-                             ++ " - " ++ globalClk ++ ") + " ++ currentTime ++ " > " 
-                             ++ phaseConst ++ "))) {"
-                , "    " ++ errF ++ "();"
-                , "  }"
-                ]
+              Just errF  -> errF ++ " ();"
           constType :: Integer -> Const
           constType c = case clockType clkData of
                           Word8  -> CWord8  (fromInteger c :: Word8)
@@ -298,7 +347,7 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
                           Word32 -> CWord32 (fromInteger c :: Word32)
                           Word64 -> CWord64 (fromInteger c :: Word64)
                           _      -> clkTypeErr
-                                               
+
   h = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
@@ -316,7 +365,6 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
                                           Word32 -> Word32
                                           Word64 -> Word64
                                           _      -> clkTypeErr)
-
   clkTypeErr :: a
   clkTypeErr = error "Clock type must be one of Word8, Word16, Word32, Word64."
 
@@ -327,7 +375,9 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
 
   covLen = 1 + div (maximum $ map ruleId rules') 32
 
-  setGlobalClk clkData = globalClk ++ " = " ++ clockName clkData ++ "();"
+  phaseStartTime     = "__phase_start_time"
+  lastPhaseStartTime = "__last_phase_start_time"
+
 
 codeIf :: Bool -> String -> String
 codeIf a b = if a then b else ""
