@@ -56,7 +56,7 @@ library
 
     extensions: GADTs, DeriveDataTypeable
 
-    ghc-options: -Wall -O2
+    ghc-options: -Wall
 
 source-repository head
     type:     git
