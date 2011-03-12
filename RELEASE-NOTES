@@ -1,3 +1,10 @@
+atom 1.0.9    03/11/2011
+
+- Better hardware clock support, for ensuring exact real-time behavior of the
+  phases.
+- Implemented a map structure for sharing between Atom expressions to improve
+  the performance of the compiler (see UeMap.hs).
+
 atom 1.0.7    09/25/2010
 
 - Support for using a HW clock to control the duration of phases.
