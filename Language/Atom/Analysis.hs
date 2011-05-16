@@ -4,7 +4,6 @@ module Language.Atom.Analysis
   ) where
 
 import Language.Atom.Elaboration
-import Language.Atom.Expressions
 import Language.Atom.UeMap
 
 -- | Topologically sorts a list of expressions and subexpressions.

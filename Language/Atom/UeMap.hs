@@ -23,7 +23,6 @@ module Language.Atom.UeMap
 import Control.Monad.State.Strict
 --import qualified Data.IntMap as M
 import qualified Data.Bimap as M
-import Data.Maybe
 import Data.List (nub)
 
 import Language.Atom.Expressions hiding (typeOf)
