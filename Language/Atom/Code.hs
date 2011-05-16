@@ -31,8 +31,14 @@ data Config = Config
 
   , cCode         :: [Name] -> [Name] -> [(Name, Type)]
                       -> (String, String)  -- ^ Custom C code to insert above
-                                           -- and below, given assertion names,
-                                           -- coverage names, and probe names
+                                           -- and below the functions, given
+                                           -- assertion names, coverage names,
+                                           -- and probe names and types.
+  , hCode         :: [Name] -> [Name] -> [(Name, Type)]
+                      -> (String, String)  -- ^ Custom C code to insert above
+                                           -- and below the state definition
+                                           -- in the header file, given assertion
+                                           -- names, coverage names, and probe names
                                            -- and types.
   , cRuleCoverage :: Bool -- ^ Enable rule coverage tracking.
   , cAssert       :: Bool -- ^ Enable assertions and functional coverage.
@@ -74,6 +80,7 @@ defaults = Config
   { cFuncName     = ""
   , cStateName    = "state"
   , cCode         = \ _ _ _ -> ("", "")
+  , hCode         = \ _ _ _ -> ("", "")
   , cRuleCoverage = True
   , cAssert       = True
   , cAssertName   = "assert"
@@ -188,7 +195,8 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
   writeFile (name ++ ".h") h
   return [ (ruleName r, div (ruleId r) 32, mod (ruleId r) 32) | r <- rules' ]
   where
-  (preCode, postCode) = cCode config assertionNames coverageNames probeNames
+  (preCode,  postCode)  = cCode config assertionNames coverageNames probeNames
+  (preHCode, postHCode) = hCode config assertionNames coverageNames probeNames
   c = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
@@ -352,9 +360,13 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
     , ""
+    , preHCode
+    , ""
     , "void " ++ funcName ++ "();"
     , ""
     , declState False (StateHierarchy (cStateName config) [state])
+    , ""
+    , postHCode
     ]
 
   globalType = cType (case hardwareClock config of
