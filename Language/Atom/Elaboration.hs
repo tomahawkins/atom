@@ -367,12 +367,11 @@ addName name = do
       put (st, (g, atom { atomNames = name : atomNames atom }))
       return $ atomName atom ++ "." ++ name
 
--- still accepts some misformed names
+-- still accepts some misformed names, like "_.." or "_]["
 checkName :: Name -> Atom ()
 checkName name =
-  if (\ x -> isAlpha x || x == '_') (head name) && 
-      and (map (\ x -> isAlphaNum x || x `elem` "._-[]") (tail name)) && 
-      and (map isAscii name)
+  if (\ x -> isAlpha x || x == '_') (head name) &&
+      and (map (\ x -> isAlphaNum x || x `elem` "._[]") (tail name))
     then return ()
     else error $ "ERROR: Name \"" ++ name ++ "\" is not a valid identifier."
 

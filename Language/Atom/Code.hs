@@ -19,7 +19,7 @@ import Language.Atom.Analysis
 import Language.Atom.Elaboration
 import Language.Atom.Expressions hiding (typeOf)
 import qualified Language.Atom.Expressions as E
-import Language.Atom.Scheduling 
+import Language.Atom.Scheduling
 import Language.Atom.UeMap
 
 -- | C code configuration parameters.
@@ -31,8 +31,14 @@ data Config = Config
 
   , cCode         :: [Name] -> [Name] -> [(Name, Type)]
                       -> (String, String)  -- ^ Custom C code to insert above
-                                           -- and below, given assertion names,
-                                           -- coverage names, and probe names
+                                           -- and below the functions, given
+                                           -- assertion names, coverage names,
+                                           -- and probe names and types.
+  , hCode         :: [Name] -> [Name] -> [(Name, Type)]
+                      -> (String, String)  -- ^ Custom C code to insert above
+                                           -- and below the state definition
+                                           -- in the header file, given assertion
+                                           -- names, coverage names, and probe names
                                            -- and types.
   , cRuleCoverage :: Bool -- ^ Enable rule coverage tracking.
   , cAssert       :: Bool -- ^ Enable assertions and functional coverage.
@@ -74,6 +80,7 @@ defaults = Config
   { cFuncName     = ""
   , cStateName    = "state"
   , cCode         = \ _ _ _ -> ("", "")
+  , hCode         = \ _ _ _ -> ("", "")
   , cRuleCoverage = True
   , cAssert       = True
   , cAssertName   = "assert"
@@ -116,7 +123,7 @@ cType t = case t of
   Double -> "double"
 
 codeUE :: UeMap -> Config -> [(Hash, String)] -> String -> (Hash, String) -> String
-codeUE mp config ues d (ue, n) = 
+codeUE mp config ues d (ue, n) =
   d ++ cType (typeOf ue mp) ++ " " ++ n ++ " = " ++ basic ++ ";\n"
   where
   operands = map (fromJust . flip lookup ues) $ ueUpstream ue mp
@@ -175,7 +182,7 @@ codeUE mp config ues d (ue, n) =
 type RuleCoverage = [(Name, Int, Int)]
 
 -- containMathHFunctions :: [Rule] -> Bool
--- containMathHFunctions rules = 
+-- containMathHFunctions rules =
 --   any math rules
 --   where math rule = case rule of
 --                       Rule _ _ _ _ _ _ _ b -> b
@@ -188,11 +195,12 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
   writeFile (name ++ ".h") h
   return [ (ruleName r, div (ruleId r) 32, mod (ruleId r) 32) | r <- rules' ]
   where
-  (preCode, postCode) = cCode config assertionNames coverageNames probeNames
+  (preCode,  postCode)  = cCode config assertionNames coverageNames probeNames
+  (preHCode, postHCode) = hCode config assertionNames coverageNames probeNames
   c = unlines
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
-    , codeIf (M.fold (\_ e ans -> isMathHCall e || ans ) False (snd mp)) 
+    , codeIf (M.fold (\_ e ans -> isMathHCall e || ans ) False (snd mp))
              "#include <math.h>"
     , ""
     , preCode
@@ -208,13 +216,13 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
     , codeIf (cRuleCoverage config) $ "static " ++ cType Word32
                  ++ " __coverage[" ++ show covLen ++ "] = {"
                  ++ (concat $ intersperse ", " $ replicate covLen "0") ++ "};"
-    , codeIf (cRuleCoverage config) 
+    , codeIf (cRuleCoverage config)
              ("static " ++ cType Word32 ++ " __coverage_index = 0;")
     , declState True (StateHierarchy (cStateName config) [state])
     , concatMap (codeRule mp config) rules'
     , codeAssertionChecks mp config assertionNames coverageNames rules
-    , "void " ++ funcName ++ "() {"
-    , swOrHwClock
+    , "void " ++ funcName ++ "()"
+    , "{"
     , unlines [ swOrHwClock
               , codePeriodPhases
               , "  " ++ globalClk ++ " = " ++ globalClk ++ " + 1;"
@@ -352,9 +360,13 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
     [ "#include <stdbool.h>"
     , "#include <stdint.h>"
     , ""
+    , preHCode
+    , ""
     , "void " ++ funcName ++ "();"
     , ""
     , declState False (StateHierarchy (cStateName config) [state])
+    , ""
+    , postHCode
     ]
 
   globalType = cType (case hardwareClock config of
@@ -383,25 +395,25 @@ codeIf :: Bool -> String -> String
 codeIf a b = if a then b else ""
 
 declState :: Bool -> StateHierarchy -> String
-declState define a = 
-     (if define then "" else "extern ") ++ init (init (f1 "" a)) 
+declState define a =
+     (if define then "" else "extern ") ++ init (init (f1 "" a))
   ++ (if define then " =\n" ++ f2 "" a else "") ++ ";\n"
   where
   f1 i a = case a of
-    StateHierarchy name items -> 
-         i ++ "struct {  /* " ++ name ++ " */\n" 
+    StateHierarchy name items ->
+         i ++ "struct {  /* " ++ name ++ " */\n"
       ++ concatMap (f1 ("  " ++ i)) items ++ i ++ "} " ++ name ++ ";\n"
     StateVariable  name c     -> i ++ cType (E.typeOf c) ++ " " ++ name ++ ";\n"
-    StateArray     name c     -> 
+    StateArray     name c     ->
       i ++ cType (E.typeOf $ head c) ++ " " ++ name ++ "[" ++ show (length c) ++ "];\n"
 
   f2 i a = case a of
-    StateHierarchy name items -> 
-         i ++ "{  /* " ++ name ++ " */\n" 
+    StateHierarchy name items ->
+         i ++ "{  /* " ++ name ++ " */\n"
       ++ intercalate ",\n" (map (f2 ("  " ++ i)) items) ++ "\n" ++ i ++ "}"
     StateVariable  name c     -> i ++ "/* " ++ name ++ " */  " ++ showConst c
-    StateArray     name c     -> 
-         i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ " 
+    StateArray     name c     ->
+         i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ "
       ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
 
 codeRule :: UeMap -> Config -> Rule -> String
@@ -411,9 +423,9 @@ codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
   concatMap (codeUE mp config ues "  ") ues ++
   "  if (" ++ id (ruleEnable rule) ++ ") {\n" ++
   concatMap codeAction (ruleActions rule) ++
-  codeIf (cRuleCoverage config) 
-         ( "    __coverage[" ++ covWord ++ "] = __coverage[" ++ covWord 
-          ++ "] | (1 << " ++ covBit ++ ");\n") 
+  codeIf (cRuleCoverage config)
+         ( "    __coverage[" ++ covWord ++ "] = __coverage[" ++ covWord
+          ++ "] | (1 << " ++ covBit ++ ");\n")
   ++ "  }\n" ++ concatMap codeAssign (ruleAssigns rule) ++ "}\n\n"
   where
   ues = topo mp $ allUEs rule
@@ -430,7 +442,7 @@ codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
     where
     lh = case uv of
       MUV _ n _                     -> concat [cStateName config, ".", n]
-      MUVArray (UA _ n _)     index -> 
+      MUVArray (UA _ n _)     index ->
         concat [cStateName config, ".", n, "[", id index, "]"]
       MUVArray (UAExtern n _) index -> concat [n, "[", id index, "]"]
       MUVExtern n _                 -> n
@@ -441,21 +453,21 @@ globalClk :: String
 globalClk = "__global_clock"
 
 codeAssertionChecks :: UeMap -> Config -> [Name] -> [Name] -> [Rule] -> String
-codeAssertionChecks mp config assertionNames coverageNames rules = 
+codeAssertionChecks mp config assertionNames coverageNames rules =
   codeIf (cAssert config) $
   "static void __assertion_checks() {\n" ++
   concatMap (codeUE mp config ues "  ") ues ++
-  concat [     "  if (" ++ id enable ++ ") " ++ cAssertName config 
-            ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", " 
-            ++ globalClk ++ ");\n"                                 
+  concat [     "  if (" ++ id enable ++ ") " ++ cAssertName config
+            ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", "
+            ++ globalClk ++ ");\n"
           | Assert name enable check <- rules ] ++
-  concat [     "  if (" ++ id enable ++ ") " ++ cCoverName  config 
-            ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", " 
-            ++ globalClk ++ ");\n"                                 
+  concat [     "  if (" ++ id enable ++ ") " ++ cCoverName  config
+            ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", "
+            ++ globalClk ++ ");\n"
           | Cover  name enable check <- rules ] ++
   "}\n\n"
   where
-  ues = topo mp $    concat [ [a, b] | Assert _ a b <- rules ] 
+  ues = topo mp $    concat [ [a, b] | Assert _ a b <- rules ]
                   ++ concat [ [a, b] | Cover _ a b <- rules ]
   id ue = fromJust $ lookup ue ues
   assertionId :: Name -> String
