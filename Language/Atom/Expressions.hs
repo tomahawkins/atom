@@ -570,7 +570,7 @@ instance (Expr a, OrdE a, EqE a, IntegralE a, Bits a) => Bits (E a) where
   complement a = BWNot a
   (Const a) .|. (Const b) = Const $ a .|. b
   a .|. b = BWOr  a b
-  xor = BWXor a b
+  xor a b = BWXor a b
   shift (Const a) n = Const $ shift a n
   shift a n = Shift a n
   rotate a n | n >= width a = error "E rotates too far."
