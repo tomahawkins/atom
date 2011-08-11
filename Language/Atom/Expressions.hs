@@ -42,6 +42,15 @@ module Language.Atom.Expressions
   , any_
   , all_
   , imply
+  -- * Bit-wise Operations
+  , (.&.)
+  , complement
+  , (.|.)
+  , xor
+  , shift
+  , rotate
+  , bitSize
+  , isSigned
   -- * Equality and Comparison
   , (==.)
   , (/=.)
@@ -196,6 +205,7 @@ data E a where
   BWNot   :: IntegralE a => E a -> E a
   BWAnd   :: IntegralE a => E a -> E a -> E a
   BWOr    :: IntegralE a => E a -> E a -> E a
+  BWXor   :: IntegralE a => E a -> E a -> E a
   Shift   :: IntegralE a => E a -> Int -> E a
   Eq      :: EqE a  => E a -> E a -> E Bool
   Lt      :: OrdE a => E a -> E a -> E Bool
@@ -243,6 +253,7 @@ data UE
   | UBWNot UE
   | UBWAnd UE UE
   | UBWOr  UE UE
+  | UBWXor UE UE
   | UShift UE Int
   | UEq    UE UE
   | ULt    UE UE
@@ -343,6 +354,7 @@ instance TypeOf UE where
     UBWNot a   -> typeOf a
     UBWAnd a _ -> typeOf a
     UBWOr  a _ -> typeOf a
+    UBWXor a _ -> typeOf a
     UShift a _ -> typeOf a
     UEq  _ _   -> Bool
     ULt  _ _   -> Bool
@@ -557,8 +569,8 @@ instance (Expr a, OrdE a, EqE a, IntegralE a, Bits a) => Bits (E a) where
   complement (Const a) = Const $ complement a
   complement a = BWNot a
   (Const a) .|. (Const b) = Const $ a .|. b
-  a .|. b = BWOr a b
-  xor a b = (a .&. complement b) .|. (complement a .&. b)
+  a .|. b = BWOr  a b
+  xor = BWXor a b
   shift (Const a) n = Const $ shift a n
   shift a n = Shift a n
   rotate a n | n >= width a = error "E rotates too far."
@@ -609,7 +621,7 @@ any_ :: (a -> E Bool) -> [a] -> E Bool
 any_ f a = or_ $ map f a
 
 -- Logical implication (if a then b).
-imply :: E Bool -> E Bool -> E Bool 
+imply :: E Bool -> E Bool -> E Bool
 imply a b = not_ a ||. b
 
 -- | Equal.
@@ -726,6 +738,7 @@ ue t = case t of
   BWNot  a     -> UBWNot   (ue a)
   BWAnd  a b   -> UBWAnd   (ue a) (ue b)
   BWOr   a b   -> UBWOr    (ue a) (ue b)
+  BWXor  a b   -> UBWXor   (ue a) (ue b)
   Shift  a b   -> UShift   (ue a) b
   Eq     a b   -> ueq      (ue a) (ue b)
   Lt     a b   -> ult      (ue a) (ue b)

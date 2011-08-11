@@ -61,6 +61,7 @@ data UeElem
   | MUBWNot !Hash
   | MUBWAnd !Hash !Hash
   | MUBWOr  !Hash !Hash
+  | MUBWXor !Hash !Hash
   | MUShift !Hash !Int
   | MUEq    !Hash !Hash
   | MULt    !Hash !Hash
@@ -104,6 +105,7 @@ typeOf h mp = case getUE h mp of
     MUBWNot a   -> typeOf' a
     MUBWAnd a _ -> typeOf' a
     MUBWOr  a _ -> typeOf' a
+    MUBWXor a _ -> typeOf' a
     MUShift a _ -> typeOf' a
     MUEq  _ _   -> Bool
     MULt  _ _   -> Bool
@@ -171,6 +173,7 @@ share e = case e of
   UBWNot  a     -> unOp a MUBWNot
   UBWAnd  a b   -> binOp (a,b) MUBWAnd
   UBWOr   a b   -> binOp (a,b) MUBWOr
+  UBWXor  a b   -> binOp (a,b) MUBWXor
   UShift  a b   -> unOp a (\x -> MUShift x b)
   UEq     a b   -> binOp (a,b) MUEq
   ULt     a b   -> binOp (a,b) MULt
@@ -264,6 +267,7 @@ recoverUE st h = case getUE h st of
   MUBWNot a    -> UBWNot (recover' a)
   MUBWAnd a b  -> UBWAnd  (recover' a) (recover' b)
   MUBWOr  a b  -> UBWOr   (recover' a) (recover' b)
+  MUBWXor a b  -> UBWXor  (recover' a) (recover' b)
   MUShift a b  -> UShift  (recover' a) b
   MUEq  a b    -> UEq     (recover' a) (recover' b)
   MULt  a b    -> ULt     (recover' a) (recover' b)
@@ -308,6 +312,7 @@ ueUpstream h t = case getUE h t of
   MUBWNot a    -> [a]
   MUBWAnd a b  -> [a, b]
   MUBWOr  a b  -> [a, b]
+  MUBWXor a b  -> [a, b]
   MUShift a _  -> [a]
   MUEq  a b    -> [a, b]
   MULt  a b    -> [a, b]
