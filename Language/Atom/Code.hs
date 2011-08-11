@@ -145,6 +145,7 @@ codeUE mp config ues d (ue, n) =
     MUBWNot _             -> ["~ ", a]
     MUBWAnd _ _           -> [a, " & ", b]
     MUBWOr  _ _           -> [a, " | ", b]
+    MUBWXor _ _           -> [a, " ^ ", b]
     MUShift _ n           -> (if n >= 0 then [a, " << ", show n] else [a, " >> ", show (negate n)])
     MUEq  _ _             -> [a, " == ", b]
     MULt  _ _             -> [a, " < " , b]
