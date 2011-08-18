@@ -47,8 +47,10 @@ module Language.Atom.Expressions
   , complement
   , (.|.)
   , xor
-  , shift
-  , rotate
+  , (.<<.)
+  , (.>>.)
+  , rol
+  , ror
   , bitSize
   , isSigned
   -- * Equality and Comparison
@@ -192,45 +194,46 @@ data UA
 
 -- | A typed expression.
 data E a where
-  VRef    :: V a -> E a
-  Const   :: a -> E a
-  Cast    :: (NumE a, NumE b) => E a -> E b
-  Add     :: NumE a => E a -> E a -> E a
-  Sub     :: NumE a => E a -> E a -> E a
-  Mul     :: NumE a => E a -> E a -> E a
-  Div     :: NumE a => E a -> E a -> E a
-  Mod     :: IntegralE a => E a -> E a -> E a
-  Not     :: E Bool -> E Bool
-  And     :: E Bool -> E Bool -> E Bool
-  BWNot   :: IntegralE a => E a -> E a
-  BWAnd   :: IntegralE a => E a -> E a -> E a
-  BWOr    :: IntegralE a => E a -> E a -> E a
-  BWXor   :: IntegralE a => E a -> E a -> E a
-  Shift   :: IntegralE a => E a -> Int -> E a
-  Eq      :: EqE a  => E a -> E a -> E Bool
-  Lt      :: OrdE a => E a -> E a -> E Bool
-  Mux     :: E Bool -> E a -> E a -> E a
-  F2B     :: E Float  -> E Word32
-  D2B     :: E Double -> E Word64
-  B2F     :: E Word32 -> E Float
-  B2D     :: E Word64 -> E Double
-  Retype  :: UE -> E a
+  VRef     :: V a -> E a
+  Const    :: a -> E a
+  Cast     :: (NumE a, NumE b) => E a -> E b
+  Add      :: NumE a => E a -> E a -> E a
+  Sub      :: NumE a => E a -> E a -> E a
+  Mul      :: NumE a => E a -> E a -> E a
+  Div      :: NumE a => E a -> E a -> E a
+  Mod      :: IntegralE a => E a -> E a -> E a
+  Not      :: E Bool -> E Bool
+  And      :: E Bool -> E Bool -> E Bool
+  BWNot    :: IntegralE a => E a -> E a
+  BWAnd    :: IntegralE a => E a -> E a -> E a
+  BWOr     :: IntegralE a => E a -> E a -> E a
+  BWXor    :: IntegralE a => E a -> E a -> E a
+  BWShiftL :: ( IntegralE a, IntegralE b ) => E a -> E b -> E a
+  BWShiftR :: ( IntegralE a, IntegralE b ) => E a -> E b -> E a
+  Eq       :: EqE a  => E a -> E a -> E Bool
+  Lt       :: OrdE a => E a -> E a -> E Bool
+  Mux      :: E Bool -> E a -> E a -> E a
+  F2B      :: E Float  -> E Word32
+  D2B      :: E Double -> E Word64
+  B2F      :: E Word32 -> E Float
+  B2D      :: E Word64 -> E Double
+  Retype   :: UE -> E a
 -- math.h:
-  Pi      :: FloatingE a => E a
-  Exp     :: FloatingE a => E a -> E a
-  Log     :: FloatingE a => E a -> E a
-  Sqrt    :: FloatingE a => E a -> E a
-  Pow     :: FloatingE a => E a -> E a -> E a
-  Sin     :: FloatingE a => E a -> E a
-  Asin    :: FloatingE a => E a -> E a
-  Cos     :: FloatingE a => E a -> E a
-  Acos    :: FloatingE a => E a -> E a
-  Sinh    :: FloatingE a => E a -> E a
-  Cosh    :: FloatingE a => E a -> E a
-  Asinh   :: FloatingE a => E a -> E a
-  Acosh   :: FloatingE a => E a -> E a
-  Atan    :: FloatingE a => E a -> E a
-  Atanh   :: FloatingE a => E a -> E a
+  Pi       :: FloatingE a => E a
+  Exp      :: FloatingE a => E a -> E a
+  Log      :: FloatingE a => E a -> E a
+  Sqrt     :: FloatingE a => E a -> E a
+  Pow      :: FloatingE a => E a -> E a -> E a
+  Sin      :: FloatingE a => E a -> E a
+  Asin     :: FloatingE a => E a -> E a
+  Cos      :: FloatingE a => E a -> E a
+  Acos     :: FloatingE a => E a -> E a
+  Sinh     :: FloatingE a => E a -> E a
+  Cosh     :: FloatingE a => E a -> E a
+  Asinh    :: FloatingE a => E a -> E a
+  Acosh    :: FloatingE a => E a -> E a
+  Atan     :: FloatingE a => E a -> E a
+  Atanh    :: FloatingE a => E a -> E a
 
 instance Show (E a) where
   show _ = error "Show (E a) not implemented"
@@ -240,44 +243,45 @@ instance Expr a => Eq (E a) where
 
 -- | An untyped term.
 data UE
-  = UVRef UV
-  | UConst Const
-  | UCast  Type UE
-  | UAdd   UE UE
-  | USub   UE UE
-  | UMul   UE UE
-  | UDiv   UE UE
-  | UMod   UE UE
-  | UNot   UE
-  | UAnd   [UE]
-  | UBWNot UE
-  | UBWAnd UE UE
-  | UBWOr  UE UE
-  | UBWXor UE UE
-  | UShift UE Int
-  | UEq    UE UE
-  | ULt    UE UE
-  | UMux   UE UE UE
-  | UF2B   UE
-  | UD2B   UE
-  | UB2F   UE
-  | UB2D   UE
+  = UVRef     UV
+  | UConst    Const
+  | UCast     Type UE
+  | UAdd      UE UE
+  | USub      UE UE
+  | UMul      UE UE
+  | UDiv      UE UE
+  | UMod      UE UE
+  | UNot      UE
+  | UAnd      [UE]
+  | UBWNot    UE
+  | UBWAnd    UE UE
+  | UBWOr     UE UE
+  | UBWXor    UE UE
+  | UBWShiftL UE UE
+  | UBWShiftR UE UE
+  | UEq       UE UE
+  | ULt       UE UE
+  | UMux      UE UE UE
+  | UF2B      UE
+  | UD2B      UE
+  | UB2F      UE
+  | UB2D      UE
 -- math.h:
   | UPi
-  | UExp   UE
-  | ULog   UE
-  | USqrt  UE
-  | UPow   UE UE
-  | USin   UE
-  | UAsin  UE
-  | UCos   UE
-  | UAcos  UE
-  | USinh  UE
-  | UCosh  UE
-  | UAsinh UE
-  | UAcosh UE
-  | UAtan  UE
-  | UAtanh UE
+  | UExp      UE
+  | ULog      UE
+  | USqrt     UE
+  | UPow      UE UE
+  | USin      UE
+  | UAsin     UE
+  | UCos      UE
+  | UAcos     UE
+  | USinh     UE
+  | UCosh     UE
+  | UAsinh    UE
+  | UAcosh    UE
+  | UAtan     UE
+  | UAtanh    UE
   deriving (Show, Eq, Ord, Data, Typeable)
 
 class Width a where
@@ -341,44 +345,45 @@ instance TypeOf (A a) where
 
 instance TypeOf UE where
   typeOf t = case t of
-    UVRef uvar -> typeOf uvar
-    UCast t _  -> t
-    UConst c   -> typeOf c
-    UAdd a _   -> typeOf a
-    USub a _   -> typeOf a
-    UMul a _   -> typeOf a
-    UDiv a _   -> typeOf a
-    UMod a _   -> typeOf a
-    UNot _     -> Bool
-    UAnd _     -> Bool
-    UBWNot a   -> typeOf a
-    UBWAnd a _ -> typeOf a
-    UBWOr  a _ -> typeOf a
-    UBWXor a _ -> typeOf a
-    UShift a _ -> typeOf a
-    UEq  _ _   -> Bool
-    ULt  _ _   -> Bool
-    UMux _ a _ -> typeOf a
-    UF2B _     -> Word32
-    UD2B _     -> Word64
-    UB2F _     -> Float
-    UB2D _     -> Double
+    UVRef     uvar  -> typeOf uvar
+    UCast     t _   -> t
+    UConst    c     -> typeOf c
+    UAdd      a _   -> typeOf a
+    USub      a _   -> typeOf a
+    UMul      a _   -> typeOf a
+    UDiv      a _   -> typeOf a
+    UMod      a _   -> typeOf a
+    UNot      _     -> Bool
+    UAnd      _     -> Bool
+    UBWNot    a     -> typeOf a
+    UBWAnd    a _   -> typeOf a
+    UBWOr     a _   -> typeOf a
+    UBWXor    a _   -> typeOf a
+    UBWShiftL a _   -> typeOf a
+    UBWShiftR a _   -> typeOf a
+    UEq       _ _   -> Bool
+    ULt       _ _   -> Bool
+    UMux      _ a _ -> typeOf a
+    UF2B      _     -> Word32
+    UD2B      _     -> Word64
+    UB2F      _     -> Float
+    UB2D      _     -> Double
 -- math.h:
-    UPi        -> Double
-    UExp   a   -> typeOf a
-    ULog   a   -> typeOf a
-    USqrt  a   -> typeOf a
-    UPow   a _ -> typeOf a
-    USin   a   -> typeOf a
-    UAsin  a   -> typeOf a
-    UCos   a   -> typeOf a
-    UAcos  a   -> typeOf a
-    USinh  a   -> typeOf a
-    UCosh  a   -> typeOf a
-    UAsinh a   -> typeOf a
-    UAcosh a   -> typeOf a
-    UAtan  a   -> typeOf a
-    UAtanh a   -> typeOf a
+    UPi           -> Double
+    UExp      a     -> typeOf a
+    ULog      a     -> typeOf a
+    USqrt     a     -> typeOf a
+    UPow      a _   -> typeOf a
+    USin      a     -> typeOf a
+    UAsin     a     -> typeOf a
+    UCos      a     -> typeOf a
+    UAcos     a     -> typeOf a
+    USinh     a     -> typeOf a
+    UCosh     a     -> typeOf a
+    UAsinh    a     -> typeOf a
+    UAcosh    a     -> typeOf a
+    UAtan     a     -> typeOf a
+    UAtanh    a     -> typeOf a
 
 instance Expr a => TypeOf (E a) where
   typeOf = eType
@@ -565,24 +570,38 @@ instance (Num a, Fractional a, Floating a, FloatingE a) => Floating (E a) where
 
 instance (Expr a, OrdE a, EqE a, IntegralE a, Bits a) => Bits (E a) where
   (Const a) .&. (Const b) = Const $ a .&. b
-  a .&. b = BWAnd a b
-  complement (Const a) = Const $ complement a
-  complement a = BWNot a
+  a .&. b                 = BWAnd a b
+  complement (Const a)    = Const $ complement a
+  complement a            = BWNot a
   (Const a) .|. (Const b) = Const $ a .|. b
-  a .|. b = BWOr  a b
-  xor a b = BWXor a b
-  shift (Const a) n = Const $ shift a n
-  shift a n = Shift a n
-  rotate a n | n >= width a = error "E rotates too far."
-  rotate (Const a) n = Const $ rotate a n
-  rotate a n | n > 0     = shift a n .|. shift a (width a - n) .&. Const (mask n)
-             | n < 0     = shift a n .&. Const (mask $ width a + n) .|. shift a (width a + n)
-             | otherwise = a
-    where
-    mask 0 = 0
-    mask n = shiftL (mask $ n - 1) 1 + 1
+  a .|. b                 = BWOr  a b
+  xor                     = BWXor
+
+  shiftL a b              = error "shiftL undefined, for left-shifting use .<<."
+  shiftR a b              = error "shiftR undefined, for right-shifting use .>>."
+
+  rotateL a n             = error "rotateL undefined, for left-rotation use rol"
+  rotateR a n             = error "rotateR undefined, for right-rotation use ror"
   bitSize = width
   isSigned = signed
+
+-- | Bitwise left-shifting.
+(.<<.) :: ( Bits a, IntegralE a, IntegralE n ) => E a -> E n -> E a
+( Const a ) .<<. ( Const n ) = Const $ shiftL a $ fromIntegral n
+a .<<. n                     = BWShiftL a n
+
+-- | Bitwise right-shifting.
+(.>>.) :: ( Bits a, IntegralE a, IntegralE n ) => E a -> E n -> E a
+( Const a ) .>>. ( Const n ) =  Const $ shiftR a $ fromIntegral n
+a .>>. n = BWShiftR a n
+
+-- | Bitwise left-rotation.
+rol (Const a) (Const n) = Const $ rotateL a $ fromIntegral n
+rol a n = a .<<. n .|. a .>>. ( ( Const . fromIntegral . width ) a - n )
+
+-- | Bitwise right-rotation.
+ror (Const a) (Const n) = Const $ rotateR a $ fromIntegral n
+ror a n = a .>>. n .|. a .<<. ( ( Const . fromIntegral . width ) a - n )
 
 -- | True term.
 true :: E Bool
@@ -725,45 +744,46 @@ a !. i = value $ a ! i
 -- | Converts an typed expression (E a) to an untyped expression (UE).
 ue :: Expr a => E a -> UE
 ue t = case t of
-  VRef (V v)   -> UVRef v
-  Const  a     -> UConst $ constant a
-  Cast   a     -> UCast    tt (ue a)
-  Add    a b   -> UAdd     (ue a) (ue b)
-  Sub    a b   -> USub     (ue a) (ue b)
-  Mul    a b   -> UMul     (ue a) (ue b)
-  Div    a b   -> UDiv     (ue a) (ue b)
-  Mod    a b   -> UMod     (ue a) (ue b)
-  Not    a     -> unot     (ue a)
-  And    a b   -> uand     (ue a) (ue b)
-  BWNot  a     -> UBWNot   (ue a)
-  BWAnd  a b   -> UBWAnd   (ue a) (ue b)
-  BWOr   a b   -> UBWOr    (ue a) (ue b)
-  BWXor  a b   -> UBWXor   (ue a) (ue b)
-  Shift  a b   -> UShift   (ue a) b
-  Eq     a b   -> ueq      (ue a) (ue b)
-  Lt     a b   -> ult      (ue a) (ue b)
-  Mux    a b c -> umux     (ue a) (ue b) (ue c)
-  F2B    a     -> UF2B     (ue a)
-  D2B    a     -> UD2B     (ue a)
-  B2F    a     -> UB2F     (ue a)
-  B2D    a     -> UB2D     (ue a)
-  Retype a     -> a
+  VRef     (V v)   -> UVRef v
+  Const    a     -> UConst  $ constant a
+  Cast     a     -> UCast     tt (ue a)
+  Add      a b   -> UAdd      (ue a) (ue b)
+  Sub      a b   -> USub      (ue a) (ue b)
+  Mul      a b   -> UMul      (ue a) (ue b)
+  Div      a b   -> UDiv      (ue a) (ue b)
+  Mod      a b   -> UMod      (ue a) (ue b)
+  Not      a     -> unot      (ue a)
+  And      a b   -> uand      (ue a) (ue b)
+  BWNot    a     -> UBWNot    (ue a)
+  BWAnd    a b   -> UBWAnd    (ue a) (ue b)
+  BWOr     a b   -> UBWOr     (ue a) (ue b)
+  BWXor    a b   -> UBWXor    (ue a) (ue b)
+  BWShiftL a b   -> UBWShiftL (ue a) (ue b)
+  BWShiftR a b   -> UBWShiftR (ue a) (ue b)
+  Eq       a b   -> ueq       (ue a) (ue b)
+  Lt       a b   -> ult       (ue a) (ue b)
+  Mux      a b c -> umux      (ue a) (ue b) (ue c)
+  F2B      a     -> UF2B      (ue a)
+  D2B      a     -> UD2B      (ue a)
+  B2F      a     -> UB2F      (ue a)
+  B2D      a     -> UB2D      (ue a)
+  Retype   a     -> a
 -- math.h:
   Pi           -> UPi
-  Exp    a     -> UExp   (ue a)
-  Log    a     -> ULog   (ue a)
-  Sqrt   a     -> USqrt  (ue a)
-  Pow    a b   -> UPow   (ue a) (ue b)
-  Sin    a     -> USin   (ue a)
-  Asin   a     -> UAsin  (ue a)
-  Cos    a     -> UCos   (ue a)
-  Acos   a     -> UAcos  (ue a)
-  Sinh   a     -> USinh  (ue a)
-  Cosh   a     -> UCosh  (ue a)
-  Asinh  a     -> UAsinh (ue a)
-  Acosh  a     -> UAcosh (ue a)
-  Atan   a     -> UAtan  (ue a)
-  Atanh  a     -> UAtanh (ue a)
+  Exp      a     -> UExp      (ue a)
+  Log      a     -> ULog      (ue a)
+  Sqrt     a     -> USqrt     (ue a)
+  Pow      a b   -> UPow      (ue a) (ue b)
+  Sin      a     -> USin      (ue a)
+  Asin     a     -> UAsin     (ue a)
+  Cos      a     -> UCos      (ue a)
+  Acos     a     -> UAcos     (ue a)
+  Sinh     a     -> USinh     (ue a)
+  Cosh     a     -> UCosh     (ue a)
+  Asinh    a     -> UAsinh    (ue a)
+  Acosh    a     -> UAcosh    (ue a)
+  Atan     a     -> UAtan     (ue a)
+  Atanh    a     -> UAtanh    (ue a)
 
   where
   tt = eType t
@@ -880,7 +900,7 @@ balance ue = case ue of
   UBWNot a     -> UBWNot (balance a)
   UBWAnd a b   -> UBWAnd (balance a) (balance b)
   UBWOr  a b   -> UBWOr  (balance a) (balance b)
-  UShift a n   -> UShift (balance a) n
+  UShift a b   -> UShift (balance a) (balance b)
   UEq  a b     -> UEq    (balance a) (balance b)
   ULt  a b     -> ULt    (balance a) (balance b)
   UMux a t f   -> rotate $ umux a t' f'
