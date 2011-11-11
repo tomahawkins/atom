@@ -29,8 +29,8 @@ data Timer = Timer (V Word64)
 -- | Creates a new timer.
 timer :: Name -> Atom Timer
 timer name = do
-  timer <- word64 name 0
-  return $ Timer timer
+  timer' <- word64 name 0
+  return $ Timer timer'
 
 -- | Starts a Timer.  A timer can be restarted at any time.
 startTimer :: Timer -> E Word64 -> Atom ()
@@ -48,9 +48,9 @@ timerDone (Timer t) = value t <=. clock
 -- | One-shot on a rising transition.
 oneShotRise :: E Bool -> Atom (E Bool)
 oneShotRise a = do
-  last <- bool "last" False
-  last <== a
-  return $ a &&. not_ (value last)
+  last' <- bool "last" False
+  last' <== a
+  return $ a &&. not_ (value last')
 
 -- | One-shot on a falling transition.
 oneShotFall :: E Bool -> Atom (E Bool)
@@ -59,22 +59,22 @@ oneShotFall = oneShotRise . not_
 
 -- | Debounces a boolean given an on and off time (ticks) and an initial state.
 debounce :: Name -> E Word64 -> E Word64 -> Bool -> E Bool -> Atom (E Bool)
-debounce name onTime offTime init a = atom name $ do
-  last  <- bool "last" init
-  out   <- bool "out"  init
-  timer <- timer "timer"
+debounce name onTime offTime init' a = atom name $ do
+  lst  <- bool "last" init'
+  out   <- bool "out"  init'
+  timer' <- timer "timer"
   atom "on" $ do
-    cond $ a &&. not_ (value last)
-    startTimer timer onTime
-    last <== a
+    cond $ a &&. not_ (value lst)
+    startTimer timer' onTime
+    lst <== a
   atom "off" $ do
-    cond $ not_ a &&. value last
-    startTimer timer offTime
-    last <== a
+    cond $ not_ a &&. value lst
+    startTimer timer' offTime
+    lst <== a
   atom "set" $ do
-    cond $ a ==. value last
-    cond $ timerDone timer
-    out <== value last
+    cond $ a ==. value lst
+    cond $ timerDone timer'
+    out <== value lst
   return $ value out
 
 
@@ -86,10 +86,10 @@ lookupTable table x = mux (x >=. x1) y1 $ foldl f y0 table'
   (_,  y0) = head table
   (x1, y1) = last table
   table' = zip (init table) (tail table)
-  f a ((x0,y0),(x1,y1)) = mux (x >=. x0) interp a
+  f a ((a0,b0),(a1,b1)) = mux (x >=. a0) interp a
     where
-    slope = (y1 - y0) / (x1 - x0)
-    interp = (x - x0) * slope + y0
+    slope = (b1 - b0) / (a1 - a0)
+    interp = (x - a0) * slope + b0
 
 -- | Linear extrapolation and interpolation on a line with 2 points.
 --   The two x points must be different to prevent a divide-by-zero.
@@ -107,11 +107,11 @@ linear (x1, y1) (x2, y2) a = slope * a + inter
 hysteresis :: OrdE a => E a -> E a -> E a -> Atom (E Bool)
 hysteresis a b u = do
   s <- bool "s" False
-  s <== (mux (u >. max) true $ mux (u <. min) false $ value s)
+  s <== (mux (u >. max') true $ mux (u <. min') false $ value s)
   return $ value s
   where
-  min = min_ a b
-  max = max_ a b
+  min' = min_ a b
+  max' = max_ a b
 
 {-
 

@@ -13,9 +13,9 @@ topo mp ues = reverse ues'
   start = 0
   (_, ues') = foldl collect (start, []) ues
   collect :: (Int, [(Hash, String)]) -> Hash -> (Int, [(Hash, String)])
-  collect (n, ues) ue | any ((== ue) . fst) ues = (n, ues)
-  collect (n, ues) ue = (n' + 1, (ue, e n') : ues') 
-    where (n', ues') = foldl collect (n, ues) $ ueUpstream ue mp
+  collect (n, ues_) ue | any ((== ue) . fst) ues_ = (n, ues_)
+  collect (n, ues_) ue = (n' + 1, (ue, e n') : ues'') 
+    where (n', ues'') = foldl collect (n, ues_) $ ueUpstream ue mp
 
 e :: Int -> String
 e i = "__" ++ show i

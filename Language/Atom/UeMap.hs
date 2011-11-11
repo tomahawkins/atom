@@ -12,7 +12,6 @@ module Language.Atom.UeMap
   , getUE
   , newUE
   , newUV
---  , share
   , maybeUpdate
   , ueUpstream
   , nearestUVs
@@ -21,7 +20,6 @@ module Language.Atom.UeMap
   ) where
 
 import Control.Monad.State.Strict
---import qualified Data.IntMap as M
 import qualified Data.Bimap as M
 import Data.List (nub)
 
@@ -39,12 +37,12 @@ data MUV
 
 -- | Transforms a 'UV' into a 'MUV', returning the possibly updated map.
 newUV :: UV -> UeMap -> (MUV, UeMap)
-newUV uv mp =
-  case uv of
-    UV i j k       -> (MUV i j k, mp)
-    UVExtern i j   -> (MUVExtern i j, mp)
-    UVArray arr ue -> let (h,mp') = newUE ue mp in
-                      (MUVArray arr h, mp')
+newUV u mp =
+  case u of
+    UV i j k        -> (MUV i j k, mp)
+    UVExtern i j    -> (MUVExtern i j, mp)
+    UVArray arr ue_ -> let (h,mp') = newUE ue_ mp in
+                       (MUVArray arr h, mp')
 
 -- | Corresponds to 'UE's --- the elements in the sharing structure.
 data UeElem
@@ -152,7 +150,7 @@ getUE h (_,mp) =
 -- | Put a new 'UE' in the map, unless it's already in there, and return the
 -- hash pointing to the 'UE' and a new map.
 newUE :: UE -> UeMap -> (Hash, UeMap)
-newUE ue mp = runState (share ue) mp
+newUE ue_ mp = runState (share ue_) mp
 
 emptyMap :: UeMap
 emptyMap = (0, M.empty)
@@ -349,9 +347,9 @@ nearestUVs h mp = nub $ f h
   where
   f :: Hash -> [MUV]
   f hash = case getUE hash mp of
-             (MUVRef uv@(MUVArray _ h')) -> [uv] ++ f h'
-             (MUVRef uv)                 -> [uv]
-             _                           -> concatMap f $ ueUpstream hash mp
+             (MUVRef u@(MUVArray _ h')) -> [u] ++ f h'
+             (MUVRef u)                 -> [u]
+             _                          -> concatMap f $ ueUpstream hash mp
 
 -- | All array indexing subexpressions.
 arrayIndices :: Hash -> UeMap -> [(UA, Hash)]

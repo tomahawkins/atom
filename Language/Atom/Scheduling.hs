@@ -45,13 +45,13 @@ schedule rules' mp = (mp, concatMap spread periods)
     -- scheduled phase is the minimum of all schedules satisfying (A) and (B).
     
   spread :: (Int, [Rule]) -> [(Int, Int, [Rule])]
-  spread (period, rules) = 
+  spread (period, rules_) = 
     placeRules (placeExactRules (replicate period []) exactRules)
                orderedByPhase
     where
     (minRules,exactRules) = partition (\r -> case rulePhase r of
                                                MinPhase _   -> True
-                                               ExactPhase _ -> False) rules
+                                               ExactPhase _ -> False) rules_
     placeExactRules :: [[Rule]] -> [Rule] -> [[Rule]]
     placeExactRules ls [] = ls
     placeExactRules ls (r:rst) = placeExactRules (insertAt (getPh r) r ls)
@@ -75,8 +75,8 @@ schedule rules' mp = (mp, concatMap spread periods)
     lub r ls = let minI = getPh r
                    lub' i [] = i -- unreachable.  Included to prevent missing
                                  -- cases ghc warnings.
-                   lub' i ls | (head ls) == minimum ls = i
-                             | otherwise = lub' (i+1) (tail ls)
+                   lub' i ls_ | (head ls_) == minimum ls_ = i
+                              | otherwise = lub' (i+1) (tail ls_)
                in  lub' minI (drop minI $ map length ls)
 
     -- Cons rule r onto the list at index i in ls.
@@ -91,11 +91,11 @@ schedule rules' mp = (mp, concatMap spread periods)
                               | otherwise = (a, bs) : grow rest (a', b)
 
 reportSchedule :: Schedule -> String
-reportSchedule (mp, schedule) = concat
+reportSchedule (mp, schedule_) = concat
   [ "Rule Scheduling Report\n\n"
   , "Period  Phase  Exprs  Rule\n"
   , "------  -----  -----  ----\n"
-  , concatMap (reportPeriod mp) schedule
+  , concatMap (reportPeriod mp) schedule_
   , "               -----\n"
   , printf "               %5i\n" $ sum $ map (ruleComplexity mp) rules
   , "\n"
@@ -106,7 +106,7 @@ reportSchedule (mp, schedule) = concat
   , "\n"
   ]
   where
-  rules = concat $ [ r | (_, _, r) <- schedule ]
+  rules = concat $ [ r | (_, _, r) <- schedule_ ]
 
 
 reportPeriod :: UeMap -> (Int, Int, [Rule]) -> String

@@ -17,7 +17,7 @@ import Data.Bits
 import Data.Int
 import Data.List
 import Data.Word
-import Language.Atom.Code
+import Language.Atom.Code hiding (err)
 import Language.Atom.Compile
 import Language.Atom.Language
 import System.Exit
@@ -25,6 +25,7 @@ import System.IO
 import System.Process
 import Text.Printf
 
+import Prelude hiding (id)
 
 -- | Data constructor:Test
 data Test = Test
@@ -80,16 +81,16 @@ runTests seed tests = do
   when (not $ null unHitCoverage)   $ exitWith $ ExitFailure 1
 
 reportResult :: Int -> (Name, Bool, Int, a, b) -> IO ()
-reportResult m (name, pass, cycles, _, _) =
+reportResult m (name', pass, cycles', _, _) =
       printf "%s:  %s    cycles = %7i  %s\n"
         (if pass then "pass" else "FAIL")
-        (printf ("%-" ++ show m ++ "s") name :: String)
-        cycles
-        (if pass then "" else "    (see " ++ name ++ ".log)")
+        (printf ("%-" ++ show m ++ "s") name' :: String)
+        cycles'
+        (if pass then "" else "    (see " ++ name' ++ ".log)")
 
 runTest :: Int -> IO Test -> IO (Name, Bool, Int, [Name], [Name])
-runTest seed test = do
-  test <- test
+runTest seed test' = do
+  test <- test'
   putStrLn $ "running test " ++ name test ++ " ..."
   hFlush stdout
   (_, _, _, coverageNames, _) <- compile "atom_unit_test" defaults { cStateName = name test, cCode = prePostCode test, cRuleCoverage = False } $ testbench test
@@ -100,10 +101,10 @@ runTest seed test = do
       writeFile file $ out ++ err
       return (name test, False, 0, coverageNames, [])
     ExitSuccess -> do
-      log <- readProcess "./atom_unit_test" [] ""
-      let pass = not $ elem "FAILURE:" $ words log
-          covered = [ words line !! 1 | line <- lines log, isPrefixOf "covered:" line ]
-      writeFile file $ out ++ err ++ log
+      log_ <- readProcess "./atom_unit_test" [] ""
+      let pass = not $ elem "FAILURE:" $ words log_
+          covered = [ words line !! 1 | line <- lines log_, isPrefixOf "covered:" line ]
+      writeFile file $ out ++ err ++ log_
       hFlush stdout
       return (name test, pass, cycles test, coverageNames, covered)
   where
@@ -115,13 +116,13 @@ runTest seed test = do
       , "void assert (int id, unsigned char check, unsigned long long clock) {"
       , "  static unsigned char failed[" ++ show (length assertionNames) ++ "] = {" ++ intercalate "," (replicate (length assertionNames) "0") ++ "};"
       , "  if (! check) {"
-      , "    " ++ intercalate "\n    else " [ "if (id == " ++ show id ++ ") { if (! failed[id]) { printf(\"ASSERTION FAILURE: " ++ name ++ " at time %lli\\n\", clock); failed[id] = 1; } }" | (name, id) <- zip assertionNames [0..] ]
+      , "    " ++ intercalate "\n    else " [ "if (id == " ++ show id ++ ") { if (! failed[id]) { printf(\"ASSERTION FAILURE: " ++ name' ++ " at time %lli\\n\", clock); failed[id] = 1; } }" | (name', id) <- zip assertionNames [0::Int ..] ]
       , "  }"
       , "}"
       , "void cover  (int id, unsigned char check, unsigned long long clock) {"
       , "  static unsigned char covered[" ++ show (length coverageNames) ++ "] = {" ++ intercalate "," (replicate (length coverageNames) "0") ++ "};"
       , "  if (check) {"
-      , "    " ++ intercalate "\n    else " [ "if (id == " ++ show id ++ ") { if (! covered[id]) { printf(\"covered: " ++ name ++ " at time %lli\\n\", clock); covered[id] = 1; } }" | (name, id) <- zip coverageNames [0..] ]
+      , "    " ++ intercalate "\n    else " [ "if (id == " ++ show id ++ ") { if (! covered[id]) { printf(\"covered: " ++ name' ++ " at time %lli\\n\", clock); covered[id] = 1; } }" | (name', id) <- zip coverageNames [0::Int ..] ]
       , "  }"
       , "}"
       ] ++ declCode test
@@ -149,11 +150,13 @@ printStrLn s = action (\ _ -> "printf(\"" ++ s ++ "\\n\")") []
 
 -- | Print integral values.
 printIntegralE :: IntegralE a => String -> E a -> Atom ()
-printIntegralE name value = action (\ [v] -> "printf(\"" ++ name ++ ": %i\\n\", " ++ v ++ ")") [ue value]
+printIntegralE name' value' = 
+  action (\ v' -> "printf(\"" ++ name' ++ ": %i\\n\", " ++ head v' ++ ")") [ue value']
 
 -- | Print floating point values.
 printFloatingE :: FloatingE a => String -> E a -> Atom ()
-printFloatingE name value = action (\ [v] -> "printf(\"" ++ name ++ ": %f\\n\", " ++ v ++ ")") [ue value]
+printFloatingE name' value' = 
+  action (\ v' -> "printf(\"" ++ name' ++ ": %f\\n\", " ++ head v' ++ ")") [ue value']
 
 
 class Expr a => Random a where random :: E a

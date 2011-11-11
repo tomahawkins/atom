@@ -136,20 +136,20 @@ elaborateRules parentEnable atom =
       , rulePhase     = atomPhase   atom
       }
   assert :: (Name, Hash) -> UeState Rule
-  assert (name, ue) = do 
+  assert (name, u) = do 
     h <- enable 
     return $ Assert
       { ruleName      = name
       , ruleEnable    = h
-      , ruleAssert    = ue
+      , ruleAssert    = u
       }
   cover :: (Name, Hash) -> UeState Rule
-  cover (name, ue) = do 
+  cover (name, u) = do 
     h <- enable 
     return $ Cover
       { ruleName      = name
       , ruleEnable    = h
-      , ruleCover     = ue
+      , ruleCover     = u
       }
   rules :: UeState [Rule]
   rules = do
@@ -165,16 +165,16 @@ elaborateRules parentEnable atom =
                        ) [] (atomSubs atom)
     return $ asserts ++ covers ++ concat rules'
   enableAssign :: (MUV, Hash) -> UeState (MUV, Hash)
-  enableAssign (uv, ue) = do 
+  enableAssign (uv', ue') = do 
     e <- enable
-    h <- maybeUpdate (MUVRef uv)
+    h <- maybeUpdate (MUVRef uv')
     st <- S.get 
     let (h',st') = newUE (umux (recoverUE st e) 
-                               (recoverUE st ue) 
+                               (recoverUE st ue') 
                                (recoverUE st h))
                          st
     S.put st'
-    return (uv, h')
+    return (uv', h')
 
 reIdRules :: Int -> [Rule] -> [Rule]
 reIdRules _ [] = []
@@ -211,9 +211,9 @@ instance Monad Atom where
   (Atom f1) >>= f2 = Atom f3
     where
     f3 s = do
-      (a, s) <- f1 s
+      (a, s') <- f1 s
       let Atom f4 = f2 a
-      f4 s
+      f4 s'
 
 instance MonadIO Atom where
   liftIO io = Atom f
@@ -253,8 +253,8 @@ elaborate st name atom = do
   let (h,st1) = newUE (ubool True) st0
       (getRules,st2) = S.runState (elaborateRules h atomDB) st1
       rules = reIdRules 0 (reverse getRules)
-      coverageNames  = [ name | Cover  name _ _ <- rules ]
-      assertionNames = [ name | Assert name _ _ <- rules ]
+      coverageNames  = [ name' | Cover  name' _ _ <- rules ]
+      assertionNames = [ name' | Assert name' _ _ <- rules ]
       probeNames = [ (n, typeOf a st2) | (n, a) <- gProbes g ]
   if (null rules) 
     then do
@@ -274,7 +274,7 @@ trimState :: StateHierarchy -> StateHierarchy
 trimState a = case a of
   StateHierarchy name items -> 
     StateHierarchy name $ filter f $ map trimState items 
-  a -> a
+  a' -> a'
   where
   f (StateHierarchy _ []) = False
   f _ = True
@@ -330,13 +330,13 @@ data UVLocality = Array UA UE | External String Type deriving (Show, Eq, Ord)
 
 -- | Generic local variable declaration.
 var :: Expr a => Name -> a -> Atom (V a)
-var name init = do
+var name init' = do
   name' <- addName name
   (st, (g, atom)) <- get
-  let uv = UV (gVarId g) name' c
-      c = constant init
+  let uv' = UV (gVarId g) name' c
+      c = constant init'
   put (st, (g { gVarId = gVarId g + 1, gState = gState g ++ [StateVariable name c] }, atom))
-  return $ V uv
+  return $ V uv'
 
 -- | Generic external variable declaration.
 var' :: Name -> Type -> V a
@@ -345,11 +345,11 @@ var' name t = V $ UVExtern name t
 -- | Generic array declaration.
 array :: Expr a => Name -> [a] -> Atom (A a)
 array name [] = error $ "ERROR: arrays can not be empty: " ++ name
-array name init = do
+array name init' = do
   name' <- addName name
   (st, (g, atom)) <- get
   let ua = UA (gArrayId g) name' c
-      c = map constant init
+      c = map constant init'
   put (st, (g { gArrayId = gArrayId g + 1, gState = gState g ++ [StateArray name c] }, atom))
   return $ A ua
 
@@ -405,11 +405,11 @@ ruleGraph name rules uvs = do
 
 -- | All the variables that directly and indirectly control the value of an expression.
 allUVs :: UeMap -> [Rule] -> Hash -> [MUV]
-allUVs st rules ue = fixedpoint next $ nearestUVs ue st
+allUVs st rules ue' = fixedpoint next $ nearestUVs ue' st
   where
   assigns = concat [ ruleAssigns r | r@(Rule _ _ _ _ _ _ _) <- rules ]
   previousUVs :: MUV -> [MUV]
-  previousUVs uv = concat [ nearestUVs ue st | (uv', ue) <- assigns, uv == uv' ]
+  previousUVs u = concat [ nearestUVs ue_ st | (uv', ue_) <- assigns, u == uv' ]
   next :: [MUV] -> [MUV]
   next uvs = sort $ nub $ uvs ++ concatMap previousUVs uvs
 
@@ -422,11 +422,11 @@ allUEs :: Rule -> [Hash]
 allUEs rule = ruleEnable rule : ues
   where
   index :: MUV -> [Hash]
-  index (MUVArray _ ue) = [ue]
+  index (MUVArray _ ue') = [ue']
   index _ = []
   ues = case rule of
     Rule _ _ _ _ _ _ _ -> 
-         concat [ ue : index uv | (uv, ue) <- ruleAssigns rule ] 
+         concat [ ue' : index uv' | (uv', ue') <- ruleAssigns rule ] 
       ++ concat (snd (unzip (ruleActions rule)))
     Assert _ _ a       -> [a]
     Cover  _ _ a       -> [a]

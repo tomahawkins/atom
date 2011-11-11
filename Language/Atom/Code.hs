@@ -123,18 +123,18 @@ cType t = case t of
   Double -> "double"
 
 codeUE :: UeMap -> Config -> [(Hash, String)] -> String -> (Hash, String) -> String
-codeUE mp config ues d (ue, n) =
-  d ++ cType (typeOf ue mp) ++ " " ++ n ++ " = " ++ basic ++ ";\n"
+codeUE mp config ues d (ue', n) =
+  d ++ cType (typeOf ue' mp) ++ " " ++ n ++ " = " ++ basic ++ ";\n"
   where
-  operands = map (fromJust . flip lookup ues) $ ueUpstream ue mp
+  operands = map (fromJust . flip lookup ues) $ ueUpstream ue' mp
   basic :: String
-  basic = concat $ case getUE ue mp of
-    MUVRef (MUV _ n _)                 -> [cStateName config, ".", n]
-    MUVRef (MUVArray (UA _ n _) _)     -> [cStateName config, ".", n, "[", a, "]"]
-    MUVRef (MUVArray (UAExtern n _) _) -> [n, "[", a, "]"]
-    MUVRef (MUVExtern n _)             -> [n]
-    MUCast _ _     -> ["(", cType (typeOf ue mp), ") ", a]
-    MUConst c      -> [showConst c]
+  basic = concat $ case getUE ue' mp of
+    MUVRef (MUV _ k _)                 -> [cStateName config, ".", k]
+    MUVRef (MUVArray (UA _ k _) _)     -> [cStateName config, ".", k, "[", a, "]"]
+    MUVRef (MUVArray (UAExtern k _) _) -> [k, "[", a, "]"]
+    MUVRef (MUVExtern k _)             -> [k]
+    MUCast _ _     -> ["(", cType (typeOf ue' mp), ") ", a]
+    MUConst c_     -> [showConst c_]
     MUAdd _ _      -> [a, " + ", b]
     MUSub _ _      -> [a, " - ", b]
     MUMul _ _      -> [a, " * ", b]
@@ -176,7 +176,7 @@ codeUE mp config ues d (ue, n) =
       a = head operands
       b = operands !! 1
       c = operands !! 2
-      f = case ( typeOf ue mp) of
+      f = case ( typeOf ue' mp) of
             Float     -> "f"
             Double    -> ""
             _         -> error "unhandled float type"
@@ -192,7 +192,7 @@ type RuleCoverage = [(Name, Int, Int)]
 
 writeC :: Name -> Config -> StateHierarchy -> [Rule] -> Schedule -> [Name]
        -> [Name] -> [(Name, Type)] -> IO RuleCoverage
-writeC name config state rules (mp, schedule) assertionNames coverageNames probeNames = do
+writeC name config state rules (mp, schedule') assertionNames coverageNames probeNames = do
   writeFile (name ++ ".c") c
   writeFile (name ++ ".h") h
   return [ (ruleName r, div (ruleId r) 32, mod (ruleId r) 32) | r <- rules' ]
@@ -234,7 +234,7 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
     , postCode
     ]
 
-  codePeriodPhases = concatMap (codePeriodPhase config) schedule
+  codePeriodPhases = concatMap (codePeriodPhase config) schedule'
 
   swOrHwClock =
     case hardwareClock config of
@@ -324,8 +324,8 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
                       Word32 -> toInteger (maxBound :: Word32)
                       Word64 -> toInteger (maxBound :: Word64)
                       _      -> clkTypeErr
-          declareConst varName c = globalType ++ " const " ++ varName
-                                   ++ " = " ++ showConst (constType c) ++ ";"
+          declareConst varName c' = globalType ++ " const " ++ varName
+                                   ++ " = " ++ showConst (constType c') ++ ";"
           setTime     = currentTime ++ " = " ++ clockName clkData ++ "();"
           maxConst    = "__max"
           phaseConst  = "__phase_len"
@@ -351,11 +351,11 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
               Nothing    -> ""
               Just errF  -> errF ++ " ();"
           constType :: Integer -> Const
-          constType c = case clockType clkData of
-                          Word8  -> CWord8  (fromInteger c :: Word8)
-                          Word16 -> CWord16 (fromInteger c :: Word16)
-                          Word32 -> CWord32 (fromInteger c :: Word32)
-                          Word64 -> CWord64 (fromInteger c :: Word64)
+          constType c' = case clockType clkData of
+                          Word8  -> CWord8  (fromInteger c' :: Word8)
+                          Word16 -> CWord16 (fromInteger c' :: Word16)
+                          Word32 -> CWord32 (fromInteger c' :: Word32)
+                          Word64 -> CWord64 (fromInteger c' :: Word64)
                           _      -> clkTypeErr
 
   h = unlines
@@ -385,7 +385,7 @@ writeC name config state rules (mp, schedule) assertionNames coverageNames probe
   funcName = if null (cFuncName config) then name else cFuncName config
 
   rules' :: [Rule]
-  rules' = concat [ r | (_, _, r) <- schedule ]
+  rules' = concat [ r | (_, _, r) <- schedule' ]
 
   covLen = 1 + div (maximum $ map ruleId rules') 32
 
@@ -397,9 +397,9 @@ codeIf :: Bool -> String -> String
 codeIf a b = if a then b else ""
 
 declState :: Bool -> StateHierarchy -> String
-declState define a =
-     (if define then "" else "extern ") ++ init (init (f1 "" a))
-  ++ (if define then " =\n" ++ f2 "" a else "") ++ ";\n"
+declState define a' =
+     (if define then "" else "extern ") ++ init (init (f1 "" a'))
+  ++ (if define then " =\n" ++ f2 "" a' else "") ++ ";\n"
   where
   f1 i a = case a of
     StateHierarchy name items ->
@@ -423,7 +423,7 @@ codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
   "/* " ++ show rule ++ " */\n" ++
   "static void __r" ++ show (ruleId rule) ++ "() {\n" ++
   concatMap (codeUE mp config ues "  ") ues ++
-  "  if (" ++ id (ruleEnable rule) ++ ") {\n" ++
+  "  if (" ++ id' (ruleEnable rule) ++ ") {\n" ++
   concatMap codeAction (ruleActions rule) ++
   codeIf (cRuleCoverage config)
          ( "    __coverage[" ++ covWord ++ "] = __coverage[" ++ covWord
@@ -431,22 +431,22 @@ codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
   ++ "  }\n" ++ concatMap codeAssign (ruleAssigns rule) ++ "}\n\n"
   where
   ues = topo mp $ allUEs rule
-  id ue = fromJust $ lookup ue ues
+  id' ue' = fromJust $ lookup ue' ues
 
   codeAction :: (([String] -> String), [Hash]) -> String
-  codeAction (f, args) = "    " ++ f (map id args) ++ ";\n"
+  codeAction (f, args) = "    " ++ f (map id' args) ++ ";\n"
 
   covWord = show $ div (ruleId rule) 32
   covBit  = show $ mod (ruleId rule) 32
 
   codeAssign :: (MUV, Hash) -> String
-  codeAssign (uv, ue) = concat ["  ", lh, " = ", id ue, ";\n"]
+  codeAssign (uv', ue') = concat ["  ", lh, " = ", id' ue', ";\n"]
     where
-    lh = case uv of
+    lh = case uv' of
       MUV _ n _                     -> concat [cStateName config, ".", n]
       MUVArray (UA _ n _)     index ->
-        concat [cStateName config, ".", n, "[", id index, "]"]
-      MUVArray (UAExtern n _) index -> concat [n, "[", id index, "]"]
+        concat [cStateName config, ".", n, "[", id' index, "]"]
+      MUVArray (UAExtern n _) index -> concat [n, "[", id' index, "]"]
       MUVExtern n _                 -> n
 
 codeRule _ _ _ = ""
@@ -459,19 +459,19 @@ codeAssertionChecks mp config assertionNames coverageNames rules =
   codeIf (cAssert config) $
   "static void __assertion_checks() {\n" ++
   concatMap (codeUE mp config ues "  ") ues ++
-  concat [     "  if (" ++ id enable ++ ") " ++ cAssertName config
-            ++ "(" ++ assertionId name ++ ", " ++ id check ++ ", "
+  concat [     "  if (" ++ id' enable ++ ") " ++ cAssertName config
+            ++ "(" ++ assertionId name ++ ", " ++ id' check ++ ", "
             ++ globalClk ++ ");\n"
           | Assert name enable check <- rules ] ++
-  concat [     "  if (" ++ id enable ++ ") " ++ cCoverName  config
-            ++ "(" ++ coverageId  name ++ ", " ++ id check ++ ", "
+  concat [     "  if (" ++ id' enable ++ ") " ++ cCoverName  config
+            ++ "(" ++ coverageId  name ++ ", " ++ id' check ++ ", "
             ++ globalClk ++ ");\n"
           | Cover  name enable check <- rules ] ++
   "}\n\n"
   where
   ues = topo mp $    concat [ [a, b] | Assert _ a b <- rules ]
                   ++ concat [ [a, b] | Cover _ a b <- rules ]
-  id ue = fromJust $ lookup ue ues
+  id' ue' = fromJust $ lookup ue' ues
   assertionId :: Name -> String
   assertionId name = show $ fromJust $ elemIndex name assertionNames
   coverageId :: Name -> String
@@ -480,7 +480,7 @@ codeAssertionChecks mp config assertionNames coverageNames rules =
 codePeriodPhase :: Config -> (Int, Int, [Rule]) -> String
 codePeriodPhase config (period, phase, rules) = unlines
   [ printf "  {"
-  , printf "    static %s __scheduling_clock = %i;" (cType clockType) phase
+  , printf "    static %s __scheduling_clock = %i;" (cType clockType') phase
   , printf "    if (__scheduling_clock == 0) {"
   , intercalate "\n" $ map callRule rules
   , printf "      __scheduling_clock = %i;" (period - 1)
@@ -491,8 +491,8 @@ codePeriodPhase config (period, phase, rules) = unlines
   , printf "  }"
   ]
   where
-  clockType | period < 2 ^  8 = Word8
-            | period < 2 ^ 16 = Word16
-            | otherwise       = Word32
+  clockType' | period < 2 ^  (8 :: Word8)  = Word8
+             | period < 2 ^ (16 :: Word16) = Word16
+             | otherwise                   = Word32
   callRule r = concat ["      ", codeIf (cAssert config) "__assertion_checks(); ", "__r", show (ruleId r), "();  /* ", show r, " */"]
 

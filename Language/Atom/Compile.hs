@@ -18,8 +18,8 @@ import Language.Atom.Language hiding (Atom)
 -- | Compiles an atom description to C.
 compile :: Name -> Config -> Atom () 
         -> IO (Schedule, RuleCoverage, [Name], [Name], [(Name, Type)])
-compile name config atom = do
-  res <- elaborate emptyMap name atom
+compile name config atom' = do
+  res <- elaborate emptyMap name atom'
   case res of
     Nothing -> putStrLn "ERROR: Design rule checks failed." >> exitWith (ExitFailure 1)
     Just (st,(state, rules, assertionNames, coverageNames, probeNames)) -> do

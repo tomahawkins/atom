@@ -132,7 +132,7 @@ data Const
   deriving (Eq, Ord, Data, Typeable)
 
 instance Show Const where
-  show c = case c of
+  show c' = case c' of
     CBool   True  -> "1"
     CBool   False -> "0"
     CInt8   c -> show c
@@ -327,16 +327,16 @@ instance TypeOf Const where
     CDouble _ -> Double
 
 instance TypeOf UV where
-  typeOf a = case a of
+  typeOf a' = case a' of
     UV _ _ a     -> typeOf a
     UVArray a _  -> typeOf a
     UVExtern _ t -> t
 
 instance TypeOf (V a) where
-  typeOf (V uv) = typeOf uv
+  typeOf (V uv') = typeOf uv'
 
 instance TypeOf UA where
-  typeOf a = case a of
+  typeOf a' = case a' of
     UA _ _ c     -> typeOf $ head c
     UAExtern _ t -> t
 
@@ -344,7 +344,7 @@ instance TypeOf (A a) where
   typeOf (A ua) = typeOf ua
 
 instance TypeOf UE where
-  typeOf t = case t of
+  typeOf t' = case t' of
     UVRef     uvar  -> typeOf uvar
     UCast     t _   -> t
     UConst    c     -> typeOf c
@@ -577,11 +577,11 @@ instance (Expr a, OrdE a, EqE a, IntegralE a, Bits a) => Bits (E a) where
   a .|. b                 = BWOr  a b
   xor                     = BWXor
 
-  shiftL a b              = error "shiftL undefined, for left-shifting use .<<."
-  shiftR a b              = error "shiftR undefined, for right-shifting use .>>."
+  shiftL _ _              = error "shiftL undefined, for left-shifting use .<<."
+  shiftR _ _              = error "shiftR undefined, for right-shifting use .>>."
 
-  rotateL a n             = error "rotateL undefined, for left-rotation use rol"
-  rotateR a n             = error "rotateR undefined, for right-rotation use ror"
+  rotateL _ _             = error "rotateL undefined, for left-rotation use rol"
+  rotateR _ _             = error "rotateR undefined, for right-rotation use ror"
   bitSize = width
   isSigned = signed
 
@@ -596,10 +596,12 @@ a .<<. n                     = BWShiftL a n
 a .>>. n = BWShiftR a n
 
 -- | Bitwise left-rotation.
+rol :: (IntegralE a, IntegralE n, Bits a) => E a -> E n -> E a
 rol (Const a) (Const n) = Const $ rotateL a $ fromIntegral n
 rol a n = a .<<. n .|. a .>>. ( ( Const . fromIntegral . width ) a - n )
 
 -- | Bitwise right-rotation.
+ror :: (IntegralE a, IntegralE n, Bits a) => E a -> E n -> E a
 ror (Const a) (Const n) = Const $ rotateR a $ fromIntegral n
 ror a n = a .>>. n .|. a .<<. ( ( Const . fromIntegral . width ) a - n )
 
@@ -685,10 +687,10 @@ maximum_ = foldl1 max_
 
 -- | Limits between min and max.
 limit :: OrdE a => E a -> E a -> E a -> E a
-limit a b i = max_ min $ min_ max i
+limit a b i = max_ min' $ min_ max' i
   where
-  min = min_ a b
-  max = max_ a b
+  min' = min_ a b
+  max' = max_ a b
 
 -- | Division.  If both the dividend and divisor are constants, a compile-time
 -- check is made for divide-by-zero.  Otherwise, if the divisor ever evaluates
