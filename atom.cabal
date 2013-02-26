@@ -1,5 +1,5 @@
 name:    atom
-version: 1.0.10
+version: 1.0.12
 
 category: Language, Embedded
 
@@ -34,11 +34,11 @@ extra-source-files:
 library
     build-depends:
         base       >= 4.0     && < 5,
-        mtl        >= 1.1.0.1,
-        process    >= 1.0.1.1 && < 1.2,
-        syb        >= 0.1.0.0,
-        containers >= 0.4,
-        bimap      >= 0.2.4
+        mtl        ,
+        process    ,
+        syb        ,
+        containers ,
+        bimap
 
     exposed-modules:
         Language.Atom
