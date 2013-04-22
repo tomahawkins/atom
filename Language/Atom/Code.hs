@@ -397,7 +397,8 @@ codeIf :: Bool -> String -> String
 codeIf a b = if a then b else ""
 
 declState :: Bool -> StateHierarchy -> String
-declState define a' =
+declState define a' = if isHierarchyEmpty a' then ""
+  else
      (if define then "" else "extern ") ++ init (init (f1 "" a'))
   ++ (if define then " =\n" ++ f2 "" a' else "") ++ ";\n"
   where
@@ -417,6 +418,11 @@ declState define a' =
     StateArray     name c     ->
          i ++ "/* " ++ name ++ " */\n" ++ i ++ "{ "
       ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
+
+  isHierarchyEmpty h = case h of
+    StateHierarchy n i -> if null i then True else and $ map isHierarchyEmpty i
+    StateVariable n c -> False
+    StateArray n c -> False
 
 codeRule :: UeMap -> Config -> Rule -> String
 codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
