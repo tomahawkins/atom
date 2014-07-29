@@ -33,11 +33,16 @@ timer name = do
   return $ Timer timer'
 
 -- | Starts a Timer.  A timer can be restarted at any time.
-startTimer :: Timer -> E Word64 -> Atom ()
+startTimer :: Timer -- ^ Timer to start
+           -> E Word64 -- ^ Number of clock ticks the timer shall run
+           -> Atom ()
 startTimer t = startTimerIf t true
 
 -- | Conditionally start a Timer.
-startTimerIf :: Timer -> E Bool -> E Word64 -> Atom ()
+startTimerIf :: Timer -- ^ Timer to start conditionally
+             -> E Bool -- ^ Condition for starting the timer
+             -> E Word64 -- ^ Number of ticks the timer shall run
+             -> Atom ()
 startTimerIf (Timer t) a time = t <== mux a (clock + time) (value t)
 
 -- | 'True' when a timer has completed.
@@ -58,7 +63,12 @@ oneShotFall = oneShotRise . not_
 
 
 -- | Debounces a boolean given an on and off time (ticks) and an initial state.
-debounce :: Name -> E Word64 -> E Word64 -> Bool -> E Bool -> Atom (E Bool)
+debounce :: Name -- ^ Name of the resulting atom
+         -> E Word64 -- ^ On time in ticks
+         -> E Word64 -- ^ Off time in ticks
+         -> Bool -- ^ Initial value
+         -> E Bool -- ^ The boolean to debounce
+         -> Atom (E Bool) -- ^ Resulting debounced boolean
 debounce name onTime offTime init' a = atom name $ do
   lst  <- bool "last" init'
   out   <- bool "out"  init'
