@@ -25,6 +25,7 @@ module Language.Atom.Elaboration
   , allUEs
   ) where
 
+import Control.Monad (ap)
 import Control.Monad.Trans
 import Data.Function (on)
 import Data.List
@@ -205,6 +206,13 @@ type AtomSt = (UeMap, (Global, AtomDB))
 
 -- | The Atom monad holds variable and rule declarations.
 data Atom a = Atom (AtomSt -> IO (a, AtomSt))
+
+instance Applicative Atom where
+  pure = return
+  (<*>) = ap
+
+instance Functor Atom where
+  fmap = S.liftM
 
 instance Monad Atom where
   return a = Atom (\ s -> return (a, s))
