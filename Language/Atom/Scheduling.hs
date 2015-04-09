@@ -1,4 +1,8 @@
--- | Atom rule scheduling.
+-- | 
+-- Module: Scheduling
+-- Description: Atom rule scheduling
+-- Copyright: (c) ?
+
 module Language.Atom.Scheduling
   ( schedule
   , Schedule

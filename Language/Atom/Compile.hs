@@ -1,4 +1,8 @@
--- | Atom compilation.
+-- | 
+-- Module: Code
+-- Description: Atom compilation
+-- Copyright: (c) ?
+
 module Language.Atom.Compile
   ( compile
   , reportSchedule

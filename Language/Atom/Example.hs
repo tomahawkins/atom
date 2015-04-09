@@ -1,4 +1,8 @@
--- | An example atom design.
+-- | 
+-- Module: Code
+-- Description: An example Atom design.
+-- Copyright: (c) ?
+
 module Language.Atom.Example
   ( compileExample
   , example

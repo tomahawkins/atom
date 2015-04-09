@@ -1,4 +1,8 @@
--- | Common Atom functions.
+-- | 
+-- Module: Common
+-- Description: Common Atom functions.
+-- Copyright: (c) ?
+
 module Language.Atom.Common
   (
   -- * Timers

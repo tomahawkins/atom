@@ -1,3 +1,8 @@
+-- | 
+-- Module: Analysis
+-- Description: -
+-- Copyright: (c) ?
+
 module Language.Atom.Analysis
   ( topo
   , ruleComplexity

@@ -1,3 +1,8 @@
+-- | 
+-- Module: Elaboration
+-- Description: -
+-- Copyright: (c) ?
+
 module Language.Atom.Elaboration
   (
 --    UeStateT
@@ -25,6 +30,7 @@ module Language.Atom.Elaboration
   , allUEs
   ) where
 
+import Control.Applicative (Applicative, pure, (<*>))
 import Control.Monad (ap)
 import Control.Monad.Trans
 import Data.Function (on)

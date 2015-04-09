@@ -1,3 +1,7 @@
+-- | 
+-- Module: Expressions
+-- Description: -
+-- Copyright: (c) ?
 {-# LANGUAGE GADTs, DeriveDataTypeable #-}
 
 module Language.Atom.Expressions

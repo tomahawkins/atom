@@ -1,3 +1,8 @@
+-- | 
+-- Module: Unit
+-- Description: -
+-- Copyright: (c) ?
+
 module Language.Atom.Unit
   (
   -- * Types and Classes

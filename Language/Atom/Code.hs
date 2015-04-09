@@ -1,4 +1,8 @@
--- | Atom C code generation.
+-- | 
+-- Module: Code
+-- Description: Atom C code generation
+-- Copyright: (c) ?
+
 module Language.Atom.Code
   ( Config (..)
   , Clock (..)
@@ -51,13 +55,13 @@ data Config = Config
   }
 
 -- | Data associated with sampling a hardware clock.  For the clock to work
--- correctly, you MUST assign @__global_clock@ the current time (accoring to
+-- correctly, you MUST assign @__global_clock@ the current time (according to
 -- @clockName@) the first time you enter the main Atom-generated function
 -- calling your rules.
 data Clock = Clock
 
   { clockName  :: String        -- ^ C function to sample the clock.  The
-                                -- funciton is assumed to have the prototype
+                                -- function is assumed to have the prototype
                                 -- @clockType clockName(void)@.
   , clockType  :: Type          -- ^ Clock type.  Assumed to be one of Word8,
                                 -- Word16, Word32, or Word64.  It is permissible

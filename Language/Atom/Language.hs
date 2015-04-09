@@ -1,4 +1,8 @@
--- | The Atom language.
+-- | 
+-- Module: Language
+-- Description: The Atom language
+-- Copyright: (c) ?
+
 module Language.Atom.Language
   (
     module Language.Atom.Expressions

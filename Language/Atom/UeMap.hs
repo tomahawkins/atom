@@ -1,4 +1,7 @@
--- | Sharing for UEs, based on IntMaps.  The idea is to share subexpressions of 'UE's.
+-- | 
+-- Module: UeMap
+-- Description: Sharing for UEs, based on IntMaps.  The idea is to share subexpressions of 'UE's.
+-- Copyright: (c) ?
 
 module Language.Atom.UeMap
   ( UeElem (..)
