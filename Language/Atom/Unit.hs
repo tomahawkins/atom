@@ -1,7 +1,9 @@
 -- | 
 -- Module: Unit
--- Description: -
--- Copyright: (c) ?
+-- Description: Unit testing, coverage, reporting & debugging
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Unit testing, coverage, reporting & debugging for Atom
 
 module Language.Atom.Unit
   (
@@ -15,6 +17,7 @@ module Language.Atom.Unit
   , printStrLn
   , printIntegralE
   , printFloatingE
+  , printProbe
   ) where
 
 import Control.Monad
@@ -32,7 +35,7 @@ import Text.Printf
 
 import Prelude hiding (id)
 
--- | Data constructor:Test
+-- | Data constructor: Test
 data Test = Test
   { name      :: String
   , cycles    :: Int
@@ -163,6 +166,24 @@ printFloatingE :: FloatingE a => String -> E a -> Atom ()
 printFloatingE name' value' = 
   action (\ v' -> "printf(\"" ++ name' ++ ": %f\\n\", " ++ head v' ++ ")") [ue value']
 
+-- | Print the value of a probe to the console (along with its name).
+printProbe :: (String, UE) -> Atom ()
+printProbe (str, ue_) = case typeOf ue_ of
+  Bool   -> printIntegralE str (ruInt   :: E Int8)
+  Int8   -> printIntegralE str (ruInt   :: E Int8)
+  Int16  -> printIntegralE str (ruInt   :: E Int16)
+  Int32  -> printIntegralE str (ruInt   :: E Int32)
+  Int64  -> printIntegralE str (ruInt   :: E Int64)
+  Word8  -> printIntegralE str (ruInt   :: E Word8)
+  Word16 -> printIntegralE str (ruInt   :: E Word16)
+  Word32 -> printIntegralE str (ruInt   :: E Word32)
+  Word64 -> printIntegralE str (ruInt   :: E Word64)
+  Double -> printFloatingE str (ruFloat :: E Double)
+  Float  -> printFloatingE str (ruFloat :: E Float)
+  where ruInt :: IntegralE a => E a
+        ruInt = Retype ue_
+        ruFloat :: FloatingE a => E a
+        ruFloat = Retype ue_
 
 class Expr a => Random a where random :: E a
 
