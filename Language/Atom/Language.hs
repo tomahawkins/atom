@@ -246,17 +246,25 @@ double = var
 double' :: Name -> V Double
 double' name = var' name Double
 
--- | Declares an action.
-action :: ([String] -> String) -> [UE] -> Atom ()
+-- | Declares an action, which executes C code that is optionally passed
+-- some parameters.
+action :: ([String] -> String) -- ^ A function which receives a list of
+                               -- C parameters, and returns C code that
+                               -- should be executed.
+          -> [UE] -- ^ A list of expressions; the supplied functions receive
+                  -- parameters which correspond to these expressions.
+          -> Atom ()
 action f ues = do
   (st, (g, a)) <- get
-  let (st', hashes) = foldl' (\(accSt,hs) ue' -> let (h,accSt') = newUE ue' accSt in
-                                                (accSt',h:hs))
-                             (st,[]) ues
+  let (st', hashes) =
+        foldl' (\(accSt,hs) ue' ->
+                 let (h,accSt') = newUE ue' accSt in (accSt',h:hs))
+        (st,[]) ues
   put (st', (g, a { atomActions = atomActions a ++ [(f, hashes)] }))
 
 -- | Calls an external C function of type 'void f(void)'.
-call :: Name -> Atom ()
+call :: Name -- ^ Function @f@
+        -> Atom ()
 call n = action (\ _ -> n ++ "()") []
 
 -- | Declares a probe. A probe allows inspecting any expression, remotely to
