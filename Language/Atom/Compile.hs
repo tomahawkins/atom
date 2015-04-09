@@ -1,7 +1,9 @@
 -- | 
--- Module: Code
--- Description: Atom compilation
--- Copyright: (c) ?
+-- Module: Compile
+-- Description: Compilation functions
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Atom compilation functions
 
 module Language.Atom.Compile
   ( compile

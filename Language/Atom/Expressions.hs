@@ -1,7 +1,9 @@
 -- | 
 -- Module: Expressions
--- Description: -
--- Copyright: (c) ?
+-- Description: Definitions for expressions, variables, and types
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Definitions for Atom expressions, variables, and types
 {-# LANGUAGE GADTs, DeriveDataTypeable #-}
 
 module Language.Atom.Expressions
@@ -121,6 +123,7 @@ data Type
   | Double
   deriving (Show, Read, Eq, Ord, Enum, Data, Typeable)
 
+-- | Typed constant
 data Const
   = CBool   Bool
   | CInt8   Int8
@@ -150,6 +153,7 @@ instance Show Const where
     CFloat  c -> show c
     CDouble c -> show c
 
+-- | Typed expression
 data Expression
   = EBool   (E Bool)
   | EInt8   (E Int8)
@@ -163,6 +167,7 @@ data Expression
   | EFloat  (E Float)
   | EDouble (E Double)
 
+-- | Typed variable
 data Variable
   = VBool   (V Bool)
   | VInt8   (V Int8)
@@ -175,7 +180,6 @@ data Variable
   | VWord64 (V Word64)
   | VFloat  (V Float)
   | VDouble (V Double) deriving Eq
-
 
 -- | Variables updated by state transition rules.
 data V a = V UV deriving Eq
@@ -288,9 +292,12 @@ data UE
   | UAtanh    UE
   deriving (Show, Eq, Ord, Data, Typeable)
 
+-- | Types with a defined width in bits
 class Width a where
+  -- | The width of a type, in number of bits
   width :: a -> Int
 
+-- | The number of bytes that an object occupies
 bytes :: Width a => a -> Int
 bytes a = div (width a) 8 + if mod (width a) 8 == 0 then 0 else 1
 
@@ -314,7 +321,10 @@ instance Expr a => Width (V a) where width = width . typeOf
 instance Width UE              where width = width . typeOf
 instance Width UV              where width = width . typeOf
 
-class TypeOf a where typeOf :: a -> Type
+-- | Types which have a defined 'Type'
+class TypeOf a where
+  -- | The corresponding 'Type' of the given object
+  typeOf :: a -> Type
 
 instance TypeOf Const where
   typeOf a = case a of
@@ -392,7 +402,7 @@ instance TypeOf UE where
 instance Expr a => TypeOf (E a) where
   typeOf = eType
 
-
+-- | Typed expression:
 class Eq a => Expr a where
   eType      :: E a -> Type
   constant   :: a -> Const
@@ -477,7 +487,7 @@ instance Expr Double where
   variable   = VDouble
   rawBits    = D2B
 
-
+-- | Expression of numerical type
 class (Num a, Expr a, EqE a, OrdE a) => NumE a
 instance NumE Int8
 instance NumE Int16
@@ -490,7 +500,11 @@ instance NumE Word64
 instance NumE Float
 instance NumE Double
 
-class (NumE a, Integral a) => IntegralE a where signed :: E a -> Bool
+-- | Expression of integral type
+class (NumE a, Integral a) => IntegralE a where
+  -- | Returns True if expression is signed, and False if unsigned.
+  signed :: E a -> Bool
+
 instance IntegralE Int8   where signed _ = True
 instance IntegralE Int16  where signed _ = True
 instance IntegralE Int32  where signed _ = True
@@ -500,6 +514,7 @@ instance IntegralE Word16 where signed _ = False
 instance IntegralE Word32 where signed _ = False
 instance IntegralE Word64 where signed _ = False
 
+-- | Expressions which can be compared for equality
 class (Eq a, Expr a) => EqE a
 instance EqE Bool
 instance EqE Int8
@@ -513,6 +528,7 @@ instance EqE Word64
 instance EqE Float
 instance EqE Double
 
+-- | Expressions which can be ordered
 class (Eq a, Ord a, EqE a) => OrdE a
 instance OrdE Int8
 instance OrdE Int16
@@ -525,6 +541,7 @@ instance OrdE Word64
 instance OrdE Float
 instance OrdE Double
 
+-- | Floating-point typed expression
 class (RealFloat a, NumE a, OrdE a) => FloatingE a
 instance FloatingE Float
 instance FloatingE Double
@@ -645,8 +662,10 @@ all_ f a = and_ $ map f a
 any_ :: (a -> E Bool) -> [a] -> E Bool
 any_ f a = or_ $ map f a
 
--- Logical implication (if a then b).
-imply :: E Bool -> E Bool -> E Bool
+-- | Logical implication (if a then b).
+imply :: E Bool -- ^ a
+         -> E Bool -- ^ b
+         -> E Bool
 imply a b = not_ a ||. b
 
 -- | Equal.
@@ -794,20 +813,24 @@ ue t = case t of
   where
   tt = eType t
 
+-- | Convert a typed variable to an untyped one
 uv :: V a -> UV
 uv (V v) = v
 
 -- XXX A future smart constructor for numeric type casting.
 -- ucast :: Type -> UE -> UE
 
+-- | Produced an untyped expression from a constant 'Bool'
 ubool :: Bool -> UE
 ubool = UConst . CBool
 
+-- | Logical NOT of an untyped expression
 unot :: UE -> UE
 unot (UConst (CBool a)) = ubool $ not a
 unot (UNot a) = a
 unot a = UNot a
 
+-- | Logical AND of two untyped expressions
 uand :: UE -> UE -> UE
 uand a b | a == b                   = a
 uand a@(UConst (CBool False)) _     = a
@@ -847,9 +870,11 @@ reduceAnd terms | not $ null [ e | e <- terms, not $ null $ f e, all (flip elem 
 -- collect, sort, and return
 reduceAnd terms = UAnd $ sort $ nub terms
 
+-- | Logical OR of two untyped expressions
 uor :: UE -> UE -> UE
 uor a b = unot (uand (unot a) (unot b))
 
+-- | Check equality on two untyped expressions
 ueq :: UE -> UE -> UE
 ueq a b | a == b = ubool True
 ueq (UConst (CBool   a)) (UConst (CBool   b)) = ubool $ a == b
@@ -865,7 +890,10 @@ ueq (UConst (CFloat  a)) (UConst (CFloat  b)) = ubool $ a == b
 ueq (UConst (CDouble a)) (UConst (CDouble b)) = ubool $ a == b
 ueq a b = UEq a b
 
-ult :: UE -> UE -> UE
+-- | Less-than inequality on two untyped expressions
+ult :: UE -- ^ a
+       -> UE -- ^ b
+       -> UE -- ^ a < b
 ult a b | a == b = ubool False
 ult (UConst (CBool   a)) (UConst (CBool   b)) = ubool $ a < b
 ult (UConst (CInt8   a)) (UConst (CInt8   b)) = ubool $ a < b
@@ -880,7 +908,12 @@ ult (UConst (CFloat  a)) (UConst (CFloat  b)) = ubool $ a < b
 ult (UConst (CDouble a)) (UConst (CDouble b)) = ubool $ a < b
 ult a b = ULt a b
 
-umux :: UE -> UE -> UE -> UE
+-- | 2-to-1 multiplexer. If selector is true, this returns input 1; if
+-- selector is false, this returns input 2.
+umux :: UE -- ^ Selector
+        -> UE -- ^ Input 1
+        -> UE -- ^ Input 2
+        -> UE
 umux _ t f | t == f = f
 umux b t f | typeOf t == Bool = uor (uand b t) (uand (unot b) f)
 umux (UConst (CBool b)) t f = if b then t else f

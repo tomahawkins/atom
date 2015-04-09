@@ -1,7 +1,9 @@
 -- | 
 -- Module: Common
--- Description: Common Atom functions.
--- Copyright: (c) ?
+-- Description: Common functions.
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Common Atom functions
 
 module Language.Atom.Common
   (

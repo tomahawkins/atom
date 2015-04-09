@@ -1,7 +1,9 @@
 -- | 
 -- Module: Scheduling
--- Description: Atom rule scheduling
--- Copyright: (c) ?
+-- Description: Rule scheduling
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Algorithms for scheduling rules in Atom
 
 module Language.Atom.Scheduling
   ( schedule
@@ -16,7 +18,8 @@ import Language.Atom.Analysis
 import Language.Atom.Elaboration
 import Language.Atom.UeMap
 
-type Schedule = (UeMap, [(Int, Int, [Rule])])  -- (period, phase, rules)
+-- | Schedule expressed as a 'UeMap' and a list of (period, phase, rules).
+type Schedule = (UeMap, [(Int, Int, [Rule])])
 
 schedule :: [Rule] -> UeMap -> Schedule
 schedule rules' mp = (mp, concatMap spread periods)
@@ -94,6 +97,7 @@ schedule rules' mp = (mp, concatMap spread periods)
   grow ((a, bs):rest) (a', b) | a' == a   = (a, b : bs) : rest
                               | otherwise = (a, bs) : grow rest (a', b)
 
+-- | Generate a rule scheduling report for the given schedule.
 reportSchedule :: Schedule -> String
 reportSchedule (mp, schedule_) = concat
   [ "Rule Scheduling Report\n\n"
@@ -111,7 +115,6 @@ reportSchedule (mp, schedule_) = concat
   ]
   where
   rules = concat $ [ r | (_, _, r) <- schedule_ ]
-
 
 reportPeriod :: UeMap -> (Int, Int, [Rule]) -> String
 reportPeriod mp (period, phase, rules) = concatMap reportRule rules

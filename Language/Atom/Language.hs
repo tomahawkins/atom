@@ -1,7 +1,9 @@
 -- | 
 -- Module: Language
--- Description: The Atom language
--- Copyright: (c) ?
+-- Description: Definitions for the language/EDSL itself
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Definitions for the Atom EDSL itself
 
 module Language.Atom.Language
   (
@@ -257,8 +259,11 @@ action f ues = do
 call :: Name -> Atom ()
 call n = action (\ _ -> n ++ "()") []
 
--- | Declares a probe.
-probe :: Expr a => Name -> E a -> Atom ()
+-- | Declares a probe. A probe allows inspecting any expression, remotely to
+-- its context, at any desired rate.
+probe :: Expr a => Name -- ^ Human-readable probe name
+         -> E a -- ^ Expression to inspect
+         -> Atom ()
 probe name a = do
   (st, (g, atom')) <- get
   let (h,st') = newUE (ue a) st
@@ -266,7 +271,9 @@ probe name a = do
     then error $ "ERROR: Duplicated probe name: " ++ name
     else put (st', (g { gProbes = (name, h) : gProbes g }, atom'))
 
--- | Fetches all declared probes to current design point.
+-- | Fetches all declared probes to current design point.  The list contained
+-- therein is (probe name, untyped expression).
+-- See 'Language.Atom.Unit.printProbe'.
 probes :: Atom [(String, UE)]
 probes = do
   (st, (g, _)) <- get
@@ -274,11 +281,11 @@ probes = do
   let g' = zip strs (map (recoverUE st) hs)
   return g'
 
--- | Increments a NumE 'V'.
+-- | Increments a 'NumE' 'V'.
 incr :: (Assign a, NumE a) => V a -> Atom ()
 incr a = a <== value a + 1
 
--- | Decrements a NumE 'V'.
+-- | Decrements a 'NumE' 'V'.
 decr :: (Assign a, NumE a) => V a -> Atom ()
 decr a = a <== value a - 1
 

@@ -1,7 +1,9 @@
 -- | 
--- Module: Code
--- Description: An example Atom design.
--- Copyright: (c) ?
+-- Module: Example
+-- Description: Example design
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- An Atom example design
 
 module Language.Atom.Example
   ( compileExample
