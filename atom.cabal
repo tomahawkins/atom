@@ -45,6 +45,9 @@ library
         Language.Atom.Analysis
         Language.Atom.Code
         Language.Atom.Common
+        --Language.Atom.Common.Fader
+        --Language.Atom.Common.Threshold
+        Language.Atom.Common.ValidData
         Language.Atom.Compile
         Language.Atom.Elaboration
         Language.Atom.Example
