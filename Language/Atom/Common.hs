@@ -126,8 +126,8 @@ linear (x1, y1) (x2, y2) a = slope * a + inter
 -- | Hysteresis returns 'True' when the input exceeds @max@ and 'False' when
 -- the input is less than @min@.  The state is held when the input is between
 -- @min@ and @max@.
-hysteresis :: OrdE a => E a -- ^ @min@
-              -> E a -- ^ @max@
+hysteresis :: OrdE a => E a -- ^ min
+              -> E a -- ^ max
               -> E a -- ^ Input
               -> Atom (E Bool)
 hysteresis a b u = do

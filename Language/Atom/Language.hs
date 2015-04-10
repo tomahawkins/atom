@@ -84,20 +84,21 @@ infixr 1 <==
 -- | The Atom monad captures variable and transition rule declarations.
 type Atom = E.Atom
 
--- | Creates a hierarchical node, where each node could be a atomic rule.
+-- | Creates a hierarchical node, where each node could be an atomic rule.
 atom :: Name -> Atom a -> Atom a
 atom name design = do
   name' <- addName name
   (st1, (g1, parent)) <- get
-  (a, (st2, (g2, child))) <- liftIO $ buildAtom st1 g1 { gState = [] } name' design
+  (a, (st2, (g2, child))) <- liftIO $
+                             buildAtom st1 g1 { gState = [] } name' design
   put (st2, ( g2 { gState = gState g1 ++ [StateHierarchy name $ gState g2] }
             , parent { atomSubs = atomSubs parent ++ [child] }))
   return a
 
--- | Defines the period of execution of sub rules as a factor of the base rate of the system.
---   Rule period is bound by the closest period assertion.  For example:
---
---   > period 10 $ period 2 a   -- Rules in 'a' have a period of 2, not 10.
+-- | Defines the period of execution of sub-rules as a factor of the base rate
+-- of the system.  Rule period is bound by the closest period assertion.  For
+-- example:
+-- > period 10 $ period 2 a   -- Rules in 'a' have a period of 2, not 10.
 period :: Int -> Atom a -> Atom a
 period n _ | n <= 0 = error "ERROR: Execution period must be greater than 0."
 period n atom' = do
@@ -340,7 +341,7 @@ nextCoverage = do
   return (value $ word32' "__coverage_index", value $ word32' "__coverage[__coverage_index]")
 
 
--- | An assertions checks that an E Bool is true.  Assertions are checked
+-- | An assertions checks that an 'E Bool' is true.  Assertions are checked
 -- between the execution of every rule.  Parent enabling conditions can
 -- disable assertions, but period and phase constraints do not.  Assertion
 -- names should be globally unique.
@@ -359,8 +360,8 @@ assertImply name a b = do
   cover (name ++ "Precondition") a
 
 -- | A functional coverage point tracks if an event has occured (true).
---   Coverage points are checked at the same time as assertions.
---   Coverage names should be globally unique.
+-- Coverage points are checked at the same time as assertions.
+-- Coverage names should be globally unique.
 cover :: Name -> E Bool -> Atom ()
 cover name check = do
   (st, (g, atom')) <- get
