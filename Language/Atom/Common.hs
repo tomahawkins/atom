@@ -23,6 +23,11 @@ module Language.Atom.Common
   , linear
   -- * Hysteresis
   , hysteresis
+  -- * Channels
+  , Channel (..)
+  , channel
+  , writeChannel
+  , readChannel
   ) where
 
 import Data.Word
@@ -129,30 +134,29 @@ hysteresis a b u = do
   min' = min_ a b
   max' = max_ a b
 
-{-
-
 -- | A channel is a uni-directional communication link that ensures one read for every write.
 data Channel a = Channel a (V Bool)
 
 -- | Creates a new channel, with a given name and data.
 channel :: a -> Atom (Channel a)
 channel a = do
-  hasData <- bool False
+  hasData <- bool "hasData" False
   return $ Channel a hasData
 
 -- | Write data to a 'Channel'.  A write will only suceed if the 'Channel' is empty.
-writeChannel :: Channel a -> Action ()
+writeChannel :: Channel a -> Atom ()
 writeChannel (Channel _ hasData) = do
-  when $ not_ $ value hasData
+  cond $ not_ $ value hasData
   hasData <== true
 
 -- | Read data from a 'Channel'.  A read will only suceed if the 'Channel' has data to be read.
-readChannel :: Channel a -> Action a
+readChannel :: Channel a -> Atom a
 readChannel (Channel a hasData) = do
-  when $ value hasData
+  cond $ value hasData
   hasData <== false
   return a
 
+{-
 module Language.Atom.Common.Process
   ( Process (..)
   , process

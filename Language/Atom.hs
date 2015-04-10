@@ -24,7 +24,17 @@ module Language.Atom
     -- * Common
     -- | Module: "Language.Atom.Common"
     Timer, timer, startTimer, startTimerIf, timerDone, oneShotRise,
-    oneShotFall, debounce, lookupTable, linear, hysteresis,
+    oneShotFall, debounce, lookupTable, linear, hysteresis, Channel (..),
+    channel, writeChannel, readChannel,
+    -- ** Signal fading
+    -- | Module: "Language.Atom.Common.Fader"
+    Fader, FaderInit (..), fader, fadeToA, fadeToB, fadeToCenter,
+    -- ** Thresholds
+    -- | Module: "Language.Atom.Common.Threshold"
+    boolThreshold, doubleThreshold,
+    -- ** Valid/Invalid data
+    -- | Module: "Language.Atom.Common.ValidData"
+    ValidData, validData, getValidData, whenValid, whenInvalid,
     -- * Language & EDSL
     -- | Module: "Language.Atom.Language"
     Atom, atom, period, getPeriod, phase, exactPhase, getPhase, cond,
@@ -51,5 +61,8 @@ module Language.Atom
 import Language.Atom.Code
 import Language.Atom.Compile
 import Language.Atom.Common
+import Language.Atom.Common.Fader
+import Language.Atom.Common.Threshold
+import Language.Atom.Common.ValidData
 import Language.Atom.Language
 import Language.Atom.Unit

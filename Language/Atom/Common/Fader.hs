@@ -8,57 +8,63 @@ module Language.Atom.Common.Fader
   , fadeToCenter
   ) where
 
-import Language.Atom
+import Language.Atom.Expressions
+import Language.Atom.Language
+import Data.Int (Int32)
 
 -- | Fader object.
-data Fader = Fader (V Int)
+data Fader = Fader (V Int32)
 
 -- | Fader initalization.
 data FaderInit = OnA | OnB | OnCenter
 
+toA, toB, toCenter :: Int32
 toA = 0
 toB = 1
 toCenter = 2
 
 -- | Fader construction.  Name, fade rate, fader init, and signal A and B.
 fader :: Name -> Double -> FaderInit -> E Double -> E Double -> Atom (Fader, E Double)
-fader name rate init a b = atom name $ do
+fader name_ rate init_ a b = atom name_ $ do
   --assert "positiveRate" $ rate >= 0
 
-  target <- int (case init of {OnA -> toA; OnB -> toB; OnCenter -> toCenter})
-  perA <- double (case init of {OnA -> 1;   OnB -> 0;   OnCenter -> 0.5})
+  target <- int32 "target" $ case init_ of OnA -> toA
+                                           OnB -> toB
+                                           OnCenter -> toCenter
+  perA <- double "perA" $ case init_ of OnA -> 1
+                                        OnB -> 0
+                                        OnCenter -> 0.5
 
   atom "toA" $ do
-    cond $ value target ==. intC toA
+    cond $ value target ==. Const toA
     cond $ value perA <. 1
-    perA <== mux (1 - value perA <. doubleC rate) 1 (value perA + doubleC rate)
+    perA <== mux (1 - value perA <. Const rate) 1 (value perA + Const rate)
 
   atom "toB" $ do
-    cond $ value target ==. intC toB
+    cond $ value target ==. Const toB
     cond $ value perA >. 0
-    perA <== mux (value perA <. doubleC rate) 0 (value perA - doubleC rate)
+    perA <== mux (value perA <. Const rate) 0 (value perA - Const rate)
 
   atom "toCenterFrom0" $ do
-    cond $ value target ==. intC toCenter
+    cond $ value target ==. Const toCenter
     cond $ value perA <. 0.5
-    perA <== mux (0.5 - value perA <. doubleC rate) 0.5 (value perA + doubleC rate)
+    perA <== mux (0.5 - value perA <. Const rate) 0.5 (value perA + Const rate)
 
   atom "toCenterFrom1" $ do
-    cond $ value target ==. intC toCenter
+    cond $ value target ==. Const toCenter
     cond $ value perA >. 0.5
-    perA <== mux (value perA - 0.5 <. doubleC rate) 0.5 (value perA - doubleC rate)
+    perA <== mux (value perA - 0.5 <. Const rate) 0.5 (value perA - Const rate)
 
   return (Fader target, (a * value perA + b * (1 - value perA)) / 2)
 
 -- | Fade to signal A.
-fadeToA :: Fader -> Action ()
-fadeToA (Fader target) = target <== intC toA
+fadeToA :: Fader -> Atom ()
+fadeToA (Fader target) = target <== Const toA
 
 -- | Fade to signal B.
-fadeToB :: Fader -> Action ()
-fadeToB (Fader target) = target <== intC toB
+fadeToB :: Fader -> Atom ()
+fadeToB (Fader target) = target <== Const toB
 
--- | Fade to center, ie average of signal A and B.
-fadeToCenter :: Fader -> Action ()
-fadeToCenter (Fader target) = target <== intC toCenter
-
+-- | Fade to center, i.e. average of signal A and B.
+fadeToCenter :: Fader -> Atom ()
+fadeToCenter (Fader target) = target <== Const toCenter

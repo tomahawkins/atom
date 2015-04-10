@@ -7,7 +7,8 @@ module Language.Atom.Common.ValidData
   , whenInvalid
   ) where
 
-import Language.Atom
+import Language.Atom.Expressions
+import Language.Atom.Language
 
 -- | 'ValidData' captures the data and its validity condition.
 --   'ValidData' is abstract to prevent rules from using invalid data.
