@@ -56,10 +56,10 @@ startTimerIf :: Timer -- ^ Timer to start conditionally
              -> Atom ()
 startTimerIf (Timer t) a time = t <== mux a (clock + time) (value t)
 
--- | 'True' when a timer has completed.
+-- | 'True' when a timer has completed. Note that this remains 'True' until
+-- the timer is restarted.
 timerDone :: Timer -> E Bool
 timerDone (Timer t) = value t <=. clock
-
 
 -- | One-shot on a rising transition.
 oneShotRise :: E Bool -> Atom (E Bool)
@@ -71,7 +71,6 @@ oneShotRise a = do
 -- | One-shot on a falling transition.
 oneShotFall :: E Bool -> Atom (E Bool)
 oneShotFall = oneShotRise . not_
-
 
 -- | Debounces a boolean given an on and off time (ticks) and an initial state.
 debounce :: Name -- ^ Name of the resulting atom
@@ -98,10 +97,11 @@ debounce name onTime offTime init' a = atom name $ do
     out <== value lst
   return $ value out
 
-
--- | 1-D lookup table.  X values out of table range are clipped at end Y values.
---   Input table must be monotonically increasing in X.
-lookupTable :: FloatingE a => [(E a, E a)] -> E a -> E a
+-- | 1-D lookup table.  @x@ values out of table range are clipped at end @y@
+-- values.  Input table must be monotonically increasing in @x@.
+lookupTable :: FloatingE a => [(E a, E a)] -- ^ (@x@, @y@) lookup table
+               -> E a -- ^ Input @x@ value
+               -> E a -- ^ Output @y@ value
 lookupTable table x = mux (x >=. x1) y1 $ foldl f y0 table'
   where
   (_,  y0) = head table
@@ -113,19 +113,23 @@ lookupTable table x = mux (x >=. x1) y1 $ foldl f y0 table'
     interp = (x - a0) * slope + b0
 
 -- | Linear extrapolation and interpolation on a line with 2 points.
---   The two x points must be different to prevent a divide-by-zero.
-linear :: FloatingE a => (E a, E a) -> (E a, E a) -> E a -> E a
+-- The two @x@ points must be different to prevent a divide-by-zero.
+linear :: FloatingE a => (E a, E a) -- ^ First point, (x1, y1)
+          -> (E a, E a) -- ^ Second point, (x2, y2)
+          -> E a -- ^ Input @x@ value
+          -> E a -- ^ Interpolated/extrapolated @y@ value
 linear (x1, y1) (x2, y2) a = slope * a + inter
   where
   slope = (y2 - y1) / (x2 - x1)
   inter = y1 - slope * x1
 
 -- | Hysteresis returns 'True' when the input exceeds @max@ and 'False' when
---   the input is less than @min@.  The state is held when the input is between
---   @min@ and @max@.
---
--- > hysteresis name min max input
-hysteresis :: OrdE a => E a -> E a -> E a -> Atom (E Bool)
+-- the input is less than @min@.  The state is held when the input is between
+-- @min@ and @max@.
+hysteresis :: OrdE a => E a -- ^ @min@
+              -> E a -- ^ @max@
+              -> E a -- ^ Input
+              -> Atom (E Bool)
 hysteresis a b u = do
   s <- bool "s" False
   s <== (mux (u >. max') true $ mux (u <. min') false $ value s)
