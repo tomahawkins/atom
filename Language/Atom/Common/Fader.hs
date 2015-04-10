@@ -1,4 +1,10 @@
--- | Fades one signal to another.
+-- | 
+-- Module: Fader
+-- Description: Fades one signal to another
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Fades one signal to another.
+
 module Language.Atom.Common.Fader
   ( Fader
   , FaderInit (..)
@@ -16,15 +22,22 @@ import Data.Int (Int32)
 data Fader = Fader (V Int32)
 
 -- | Fader initalization.
-data FaderInit = OnA | OnB | OnCenter
+data FaderInit = OnA -- ^ Start at signal A
+               | OnB -- ^ Start at signal B
+               | OnCenter -- ^ Start at average of A and B
 
 toA, toB, toCenter :: Int32
 toA = 0
 toB = 1
 toCenter = 2
 
--- | Fader construction.  Name, fade rate, fader init, and signal A and B.
-fader :: Name -> Double -> FaderInit -> E Double -> E Double -> Atom (Fader, E Double)
+-- | Fader construction
+fader :: Name -- ^ Name
+         -> Double -- ^ Fade rate
+         -> FaderInit -- ^ Initialization
+         -> E Double -- ^ Signal A
+         -> E Double -- ^ Signal B
+         -> Atom (Fader, E Double)
 fader name_ rate init_ a b = atom name_ $ do
   --assert "positiveRate" $ rate >= 0
 

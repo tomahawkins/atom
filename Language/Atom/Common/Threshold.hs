@@ -1,4 +1,9 @@
--- | Time integrated threshold functions typically used in condition monitoring.
+-- | 
+-- Module: Threshold
+-- Description: Time integrated threshold functions
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Time integrated threshold functions typically used in condition monitoring.
 module Language.Atom.Common.Threshold
   ( boolThreshold
   , doubleThreshold

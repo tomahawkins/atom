@@ -1,4 +1,9 @@
--- | Capturing data that can either be valid or invalid.
+-- | 
+-- Module: ValidData
+-- Description: Capturing data that can either be valid or invalid
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Capturing data that can either be valid or invalid.
 module Language.Atom.Common.ValidData
   ( ValidData
   , validData
