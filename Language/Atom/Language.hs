@@ -353,7 +353,8 @@ assert name check = do
   let (chk,st') = newUE (ue check) st
   put (st', (g, atom' { atomAsserts = (name, chk) : atomAsserts atom' }))
 
--- | Implication assertions.  Creates an implicit coverage point for the precondition.
+-- | Implication assertions.  Creates an implicit coverage point for the
+-- precondition.
 assertImply :: Name -> E Bool -> E Bool -> Atom ()
 assertImply name a b = do
   assert name $ imply a b

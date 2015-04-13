@@ -49,9 +49,10 @@ data Config = Config
     -- | Name of assertion function. Prototype:
     -- @void assert(int, bool, uint64_t);@
   , cAssertName   :: String
-    -- | Name of coverage function. Type: @void cover(int, bool, uint64_t);@
+    -- | Name of coverage function. Prototype:
+    -- @void cover(int, bool, uint64_t);@
   , cCoverName    :: String
-    -- | Hardware counter to schedule rules, or Nothing (the default).
+    -- | Hardware counter to schedule rules, or 'Nothing' (the default).
   , hardwareClock :: Maybe Clock
   }
 
@@ -72,7 +73,7 @@ data Clock = Clock
     -- prototype: @void delay(clockType i)@, where @i@ is the duration of
     -- delay/sleep.
   , delay      :: String
-    -- | Nothing or a user-defined error-reporting function if the period
+    -- | 'Nothing', or a user-defined error-reporting function if the period
     -- duration is violated, e.g., the execution time was greater than @delta@.
     -- Assumed to have prototype: @void err(void)@.
   , err        :: Maybe String

@@ -17,7 +17,7 @@ Atom eliminates the need and overhead of RTOSes for many embedded applications.
 module Language.Atom
   ( -- * Code 
     -- | Module: "Language.Atom.Code" 
-    Config (..), Clock (..), writeC, defaults, defaultClock, cType, RuleCoverage,
+    Config (..), defaults, Clock (..), defaultClock, writeC, cType, RuleCoverage,
     -- * Compilation
     -- | Module: "Language.Atom.Compile"
     compile, reportSchedule, Schedule,
