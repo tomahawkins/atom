@@ -1,3 +1,8 @@
+-- | 
+-- Module: Analysis
+-- Description: -
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+
 module Language.Atom.Analysis
   ( topo
   , ruleComplexity

@@ -1,4 +1,10 @@
--- | The Atom language.
+-- | 
+-- Module: Language
+-- Description: Definitions for the language/EDSL itself
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Definitions for the Atom EDSL itself
+
 module Language.Atom.Language
   (
     module Language.Atom.Expressions
@@ -78,20 +84,21 @@ infixr 1 <==
 -- | The Atom monad captures variable and transition rule declarations.
 type Atom = E.Atom
 
--- | Creates a hierarchical node, where each node could be a atomic rule.
+-- | Creates a hierarchical node, where each node could be an atomic rule.
 atom :: Name -> Atom a -> Atom a
 atom name design = do
   name' <- addName name
   (st1, (g1, parent)) <- get
-  (a, (st2, (g2, child))) <- liftIO $ buildAtom st1 g1 { gState = [] } name' design
+  (a, (st2, (g2, child))) <- liftIO $
+                             buildAtom st1 g1 { gState = [] } name' design
   put (st2, ( g2 { gState = gState g1 ++ [StateHierarchy name $ gState g2] }
             , parent { atomSubs = atomSubs parent ++ [child] }))
   return a
 
--- | Defines the period of execution of sub rules as a factor of the base rate of the system.
---   Rule period is bound by the closest period assertion.  For example:
---
---   > period 10 $ period 2 a   -- Rules in 'a' have a period of 2, not 10.
+-- | Defines the period of execution of sub-rules as a factor of the base rate
+-- of the system.  Rule period is bound by the closest period assertion.  For
+-- example:
+-- > period 10 $ period 2 a   -- Rules in 'a' have a period of 2, not 10.
 period :: Int -> Atom a -> Atom a
 period n _ | n <= 0 = error "ERROR: Execution period must be greater than 0."
 period n atom' = do
@@ -240,21 +247,32 @@ double = var
 double' :: Name -> V Double
 double' name = var' name Double
 
--- | Declares an action.
-action :: ([String] -> String) -> [UE] -> Atom ()
+-- | Declares an action, which executes C code that is optionally passed
+-- some parameters.
+action :: ([String] -> String) -- ^ A function which receives a list of
+                               -- C parameters, and returns C code that
+                               -- should be executed.
+          -> [UE] -- ^ A list of expressions; the supplied functions receive
+                  -- parameters which correspond to these expressions.
+          -> Atom ()
 action f ues = do
   (st, (g, a)) <- get
-  let (st', hashes) = foldl' (\(accSt,hs) ue' -> let (h,accSt') = newUE ue' accSt in
-                                                (accSt',h:hs))
-                             (st,[]) ues
+  let (st', hashes) =
+        foldl' (\(accSt,hs) ue' ->
+                 let (h,accSt') = newUE ue' accSt in (accSt',h:hs))
+        (st,[]) ues
   put (st', (g, a { atomActions = atomActions a ++ [(f, hashes)] }))
 
 -- | Calls an external C function of type 'void f(void)'.
-call :: Name -> Atom ()
+call :: Name -- ^ Function @f@
+        -> Atom ()
 call n = action (\ _ -> n ++ "()") []
 
--- | Declares a probe.
-probe :: Expr a => Name -> E a -> Atom ()
+-- | Declares a probe. A probe allows inspecting any expression, remotely to
+-- its context, at any desired rate.
+probe :: Expr a => Name -- ^ Human-readable probe name
+         -> E a -- ^ Expression to inspect
+         -> Atom ()
 probe name a = do
   (st, (g, atom')) <- get
   let (h,st') = newUE (ue a) st
@@ -262,7 +280,9 @@ probe name a = do
     then error $ "ERROR: Duplicated probe name: " ++ name
     else put (st', (g { gProbes = (name, h) : gProbes g }, atom'))
 
--- | Fetches all declared probes to current design point.
+-- | Fetches all declared probes to current design point.  The list contained
+-- therein is (probe name, untyped expression).
+-- See 'Language.Atom.Unit.printProbe'.
 probes :: Atom [(String, UE)]
 probes = do
   (st, (g, _)) <- get
@@ -270,11 +290,11 @@ probes = do
   let g' = zip strs (map (recoverUE st) hs)
   return g'
 
--- | Increments a NumE 'V'.
+-- | Increments a 'NumE' 'V'.
 incr :: (Assign a, NumE a) => V a -> Atom ()
 incr a = a <== value a + 1
 
--- | Decrements a NumE 'V'.
+-- | Decrements a 'NumE' 'V'.
 decr :: (Assign a, NumE a) => V a -> Atom ()
 decr a = a <== value a - 1
 
@@ -321,7 +341,7 @@ nextCoverage = do
   return (value $ word32' "__coverage_index", value $ word32' "__coverage[__coverage_index]")
 
 
--- | An assertions checks that an E Bool is true.  Assertions are checked
+-- | An assertions checks that an 'E Bool' is true.  Assertions are checked
 -- between the execution of every rule.  Parent enabling conditions can
 -- disable assertions, but period and phase constraints do not.  Assertion
 -- names should be globally unique.
@@ -333,15 +353,16 @@ assert name check = do
   let (chk,st') = newUE (ue check) st
   put (st', (g, atom' { atomAsserts = (name, chk) : atomAsserts atom' }))
 
--- | Implication assertions.  Creates an implicit coverage point for the precondition.
+-- | Implication assertions.  Creates an implicit coverage point for the
+-- precondition.
 assertImply :: Name -> E Bool -> E Bool -> Atom ()
 assertImply name a b = do
   assert name $ imply a b
   cover (name ++ "Precondition") a
 
 -- | A functional coverage point tracks if an event has occured (true).
---   Coverage points are checked at the same time as assertions.
---   Coverage names should be globally unique.
+-- Coverage points are checked at the same time as assertions.
+-- Coverage names should be globally unique.
 cover :: Name -> E Bool -> Atom ()
 cover name check = do
   (st, (g, atom')) <- get

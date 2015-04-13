@@ -1,4 +1,10 @@
--- | Atom compilation.
+-- | 
+-- Module: Compile
+-- Description: Compilation functions
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Atom compilation functions
+
 module Language.Atom.Compile
   ( compile
   , reportSchedule
@@ -32,8 +38,8 @@ compile name config atom' = do
 hwClockWarning :: String
 hwClockWarning = unlines
  [ ""
- , "*** Atom WARNING: you are configuring to use a hardware clock.  Please remember to set"
- , "    the \"__phase_start_time\" variable to the time at which the first phase should be"
- , "    run before you enter the main Atom-generated function the first time."
- , ""
+ , "*** Atom WARNING: you are configuring to use a hardware clock.  Please remember"
+ , "    to set the \"__phase_start_time\" variable to the time at which the first"
+ , "    phase should be run before you enter the main Atom-generated function the"
+ , "    first time."
  ]

@@ -1,4 +1,10 @@
--- | Atom C code generation.
+-- | 
+-- Module: Code
+-- Description: C code configuration and generation
+-- Copyright: (c) 2013 Tom Hawkins & Lee Pike
+--
+-- Atom C code configuration and generation
+
 module Language.Atom.Code
   ( Config (..)
   , Clock (..)
@@ -24,57 +30,57 @@ import Language.Atom.UeMap
 
 -- | C code configuration parameters.
 data Config = Config
-
-  { cFuncName     :: String -- ^ Alternative primary function name.  Leave empty
-                            -- to use compile name.
-  , cStateName    :: String -- ^ Name of state variable structure.  Default: state
-
-  , cCode         :: [Name] -> [Name] -> [(Name, Type)]
-                      -> (String, String)  -- ^ Custom C code to insert above
-                                           -- and below the functions, given
-                                           -- assertion names, coverage names,
-                                           -- and probe names and types.
-  , hCode         :: [Name] -> [Name] -> [(Name, Type)]
-                      -> (String, String)  -- ^ Custom C code to insert above
-                                           -- and below the state definition
-                                           -- in the header file, given assertion
-                                           -- names, coverage names, and probe names
-                                           -- and types.
-  , cRuleCoverage :: Bool -- ^ Enable rule coverage tracking.
-  , cAssert       :: Bool -- ^ Enable assertions and functional coverage.
-  , cAssertName   :: String -- ^ Name of assertion function.  Type: void
-                            -- assert(int, bool, uint64_t);
-  , cCoverName    :: String -- ^ Name of coverage function.  Type: void
-                            -- cover(int, bool, uint64_t);
-  , hardwareClock :: Maybe Clock -- ^ Do we use a hardware counter to schedule
-                                 -- rules?
+  { -- | Alternative primary function name.  If this is empty, then it will
+    -- default to the name passed to 'Language.Atom.Compile.compile'.
+    cFuncName     :: String
+    -- | Name of state variable structure. Default: @state@
+  , cStateName    :: String
+    -- | Custom C code to insert above and below the functions, given
+    -- assertion names, coverage names, and probe names and types.
+  , cCode         :: [Name] -> [Name] -> [(Name, Type)] -> (String, String)
+    -- | Custom C code to insert above and below the state definition in the
+    -- header file, given assertion names, coverage names, and probe names and
+    -- types.
+  , hCode         :: [Name] -> [Name] -> [(Name, Type)] -> (String, String)
+    -- | Enable rule coverage tracking.
+  , cRuleCoverage :: Bool
+    -- | Enable assertions and functional coverage.
+  , cAssert       :: Bool
+    -- | Name of assertion function. Prototype:
+    -- @void assert(int, bool, uint64_t);@
+  , cAssertName   :: String
+    -- | Name of coverage function. Prototype:
+    -- @void cover(int, bool, uint64_t);@
+  , cCoverName    :: String
+    -- | Hardware counter to schedule rules, or 'Nothing' (the default).
+  , hardwareClock :: Maybe Clock
   }
 
 -- | Data associated with sampling a hardware clock.  For the clock to work
--- correctly, you MUST assign @__global_clock@ the current time (accoring to
+-- correctly, you MUST assign @__global_clock@ the current time (according to
 -- @clockName@) the first time you enter the main Atom-generated function
 -- calling your rules.
 data Clock = Clock
-
-  { clockName  :: String        -- ^ C function to sample the clock.  The
-                                -- funciton is assumed to have the prototype
-                                -- @clockType clockName(void)@.
-  , clockType  :: Type          -- ^ Clock type.  Assumed to be one of Word8,
-                                -- Word16, Word32, or Word64.  It is permissible
-                                -- for the clock to rollover.
-  , delta      :: Integer       -- ^ Number of ticks in a phase.  Must be greater than 0.
-  , delay      :: String        -- ^ C function to delay/sleep.  The function is
-                                -- assumed to have the prototype @void
-                                -- delay(clockType i)@, where @i@ is the
-                                -- duration of delay/sleep.
-  , err        :: Maybe String  -- ^ Nothing or a user-defined error-reporting
-                                -- function if the period duration is violated;
-                                -- e.g., the execution time was greater than
-                                -- @delta@.  Assumed to have prototype @void
-                                -- err(void)@.
+  { -- | C function to sample the clock.  The function is assumed to have the
+    -- prototype: @clockType clockName(void)@.
+    clockName  :: String
+    -- | Clock type.  Assumed to be one of 'Word8', 'Word16', 'Word32', or
+    -- 'Word64'.  It is permissible for the clock to roll over.
+  , clockType  :: Type
+    -- | Number of ticks in a phase.  Must be greater than 0.
+  , delta      :: Integer
+    -- | C function to delay/sleep.  The function is assumed to have the
+    -- prototype: @void delay(clockType i)@, where @i@ is the duration of
+    -- delay/sleep.
+  , delay      :: String
+    -- | 'Nothing', or a user-defined error-reporting function if the period
+    -- duration is violated, e.g., the execution time was greater than @delta@.
+    -- Assumed to have prototype: @void err(void)@.
+  , err        :: Maybe String
   }
 
--- | Default C code configuration parameters (default function name, no pre/post code, ANSI C types).
+-- | Default C code configuration parameters (default function name, no
+-- pre/post code, ANSI C types).
 defaults :: Config
 defaults = Config
   { cFuncName     = ""
@@ -88,8 +94,15 @@ defaults = Config
   , hardwareClock = Nothing
   }
 
+-- | Default hardware clock parameters (name "@clk@", Word64, delta 1, delay
+-- function is "@delay@", no error function).
 defaultClock :: Clock
-defaultClock = Clock "clk" Word64 1 "delay" Nothing
+defaultClock = Clock { clockName = "clk"
+                     , clockType = Word64
+                     , delta = 1
+                     , delay = "delay"
+                     , err = Nothing
+                     }
 
 showConst :: Const -> String
 showConst c = case c of
