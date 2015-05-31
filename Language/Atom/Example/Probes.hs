@@ -13,6 +13,7 @@ module Language.Atom.Example.Probes where
 import Data.Word
 import Language.Atom
 
+-- | Invoke the Atom compiler
 main :: IO ()
 main = do
   let atomCfg = defaults { cCode = prePostCode , cRuleCoverage = False }
@@ -72,7 +73,7 @@ tickSecond = do
   
   sec <- word64 "seconds" 0
 
-  -- | Add a probe to the clock:
+  -- Add a probe to the clock:
   probe "Seconds" $ value sec
   
   period 1000 $ exactPhase 0 $ atom "second" $ incr sec

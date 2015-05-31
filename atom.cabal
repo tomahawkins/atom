@@ -50,7 +50,8 @@ library
         Language.Atom.Common.Threshold
         Language.Atom.Common.ValidData
         Language.Atom.Compile
-        Language.Atom.Elaboration
+        Language.Atom.Elaboration 
+        Language.Atom.Example.External
         Language.Atom.Example.Gcd
         Language.Atom.Example.Probes
         Language.Atom.Expressions
