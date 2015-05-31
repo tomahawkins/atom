@@ -1,11 +1,10 @@
 -- | 
--- Module: Example
--- Description: Example design
+-- Module: Gcd
+-- Description: Example design which computers GCD (greatest-common divisor)
 -- Copyright: (c) 2013 Tom Hawkins & Lee Pike
 --
--- An Atom example design
 
-module Language.Atom.Example
+module Language.Atom.Example.Gcd
   ( compileExample
   , example
   ) where

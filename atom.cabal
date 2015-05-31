@@ -12,7 +12,8 @@ description:
 
     In addition, Atom performs compile-time task scheduling and generates code
     with deterministic execution time and constant memory use, simplifying the
-    process of timing verification and memory consumption in hard realtime applications.
+    process of timing verification and memory consumption in hard realtime
+    applications.
 
     Without mutex locking and run-time task scheduling, Atom eliminates
     the need and overhead of RTOSs for many embedded applications.
@@ -50,7 +51,8 @@ library
         Language.Atom.Common.ValidData
         Language.Atom.Compile
         Language.Atom.Elaboration
-        Language.Atom.Example
+        Language.Atom.Example.Gcd
+        Language.Atom.Example.Probes
         Language.Atom.Expressions
         Language.Atom.Language
         Language.Atom.Scheduling
