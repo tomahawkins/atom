@@ -1,18 +1,17 @@
 -- | 
--- Module: Example
--- Description: Example design
+-- Module: Gcd
+-- Description: Example design which computes GCD (greatest-common divisor)
 -- Copyright: (c) 2013 Tom Hawkins & Lee Pike
 --
--- An Atom example design
 
-module Language.Atom.Example
+module Language.Atom.Example.Gcd
   ( compileExample
   , example
   ) where
 
 import Language.Atom
 
--- | Invoke the atom compiler.
+-- | Invoke the Atom compiler
 compileExample :: IO ()
 compileExample = do
   (schedule, _, _, _, _) <- compile "example" defaults { cCode = prePostCode } example

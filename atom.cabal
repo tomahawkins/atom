@@ -3,19 +3,20 @@ version: 1.0.12
 
 category: Language, Embedded
 
-synopsis: A DSL for embedded hard realtime applications.
+synopsis: An EDSL for embedded hard realtime applications.
 
 description:
-    Atom is a Haskell DSL for designing hard realtime embedded software.
+    Atom is a Haskell EDSL for designing hard realtime embedded software.
     Based on guarded atomic actions (similar to STM), Atom enables
     highly concurrent programming without the need for mutex locking.
 
     In addition, Atom performs compile-time task scheduling and generates code
     with deterministic execution time and constant memory use, simplifying the
-    process of timing verification and memory consumption in hard realtime applications.
+    process of timing verification and memory consumption in hard realtime
+    applications.
 
     Without mutex locking and run-time task scheduling, Atom eliminates
-    the need and overhead of RTOSs for many embedded applications.
+    the need and overhead of RTOSes for many embedded applications.
 
 author:     Tom Hawkins <tomahawkins@gmail.com>
 maintainer: Tom Hawkins <tomahawkins@gmail.com>, Lee Pike <leepike@gmail.com>
@@ -49,8 +50,10 @@ library
         Language.Atom.Common.Threshold
         Language.Atom.Common.ValidData
         Language.Atom.Compile
-        Language.Atom.Elaboration
-        Language.Atom.Example
+        Language.Atom.Elaboration 
+        Language.Atom.Example.External
+        Language.Atom.Example.Gcd
+        Language.Atom.Example.Probes
         Language.Atom.Expressions
         Language.Atom.Language
         Language.Atom.Scheduling
