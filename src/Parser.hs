@@ -10,10 +10,24 @@ import Parser.Lex
 import Parser.Parse
 import Parser.Tokens
 
-data Module = Module FilePath Path [Import] [Export] [Infix] String
+data Module a = Module FilePath Path [Import] [Export] [InfixDef] a deriving Show
+data Import = Import Path deriving Show
+data Export = Export Name deriving Show
+type InfixDef = (String, (Int, Associativity))
+data Associativity = AssocLeft | AssocRight | AssocNone deriving Show
+
+-- Parse a program.
+parseProgram :: FilePath -> IO ()
+parseProgram main
+  | isSuffixOf ".atom" main = do
+    modules <- parseModules [] $ split '/' $ take (length main - 5) main
+    mapM_ print modules
+    let m = map (parseCode $ infixDefs modules) modules
+    mapM_ print m
+  | otherwise = error "Expecting an *.atom file."
 
 -- Parse a single module.
-parseModule :: FilePath -> Path -> String -> Module
+parseModule :: FilePath -> Path -> String -> Module String
 parseModule file path a = Module file path imports' exports' infixes' a4
   where
   a1 = uncomment file a
@@ -22,34 +36,54 @@ parseModule file path a = Module file path imports' exports' infixes' a4
   (a4, infixes') = infixes a3
 
 -- Parse all the modules of a program.
-parseModules :: [Module] -> Path -> IO [Module]
+parseModules :: [Module String] -> Path -> IO [Module String]
 parseModules sofar path
   | isJust $ find (\ (Module _ p _ _ _ _) -> p == path) sofar = return sofar
   | otherwise = do
-    putStrLn file
     f <- readFile file
     let m@(Module _ _ imports _ _ _) = parseModule file path f
     foldM parseModules (sofar ++ [m]) [ i | Import i <- imports ]
     where
     file = intercalate "/" path ++ ".atom"
 
--- Parse a program.
-parseProgram :: FilePath -> IO ()
-parseProgram main
-  | isSuffixOf ".atom" main = do
-    modules <- parseModules [] [reverse $ drop 5 $ reverse main]
-    m <- mapM parseCode modules
-    print m
-  | otherwise = error "Expecting *.atom file."
-
-parseCode :: Module -> IO [TopDeclaration]
-parseCode (Module file _ _ _ _ content) = do
-  putStrLn $ "Parsing " ++ show file ++ " ..."
-  return $ topDeclarations tokens
+-- Given a list of program modules, build a list of infix definitions (precedence and associativity).
+infixDefs :: [Module a] -> [InfixDef]
+infixDefs modules
+  | null duplicates = defs
+  | otherwise       = error $ "Duplicate infix symbols: " ++ show duplicates
   where
-  tokens = map relocate $ alexScanTokens content
+  defs = concat [ a | Module _ _ _ _ a _ <- modules ]
+  symbols = fst $ unzip defs
+  duplicates = symbols \\ nub symbols
+
+-- Looks up a symbol in the infix table to change the token.
+infixName :: (Int, Associativity) -> TokenName
+infixName (prec, assoc) = case prec of
+  0 -> case assoc of { AssocLeft -> InfixL0; AssocRight -> InfixR0; AssocNone -> Infix0 }
+  1 -> case assoc of { AssocLeft -> InfixL1; AssocRight -> InfixR1; AssocNone -> Infix1 }
+  2 -> case assoc of { AssocLeft -> InfixL2; AssocRight -> InfixR2; AssocNone -> Infix2 }
+  3 -> case assoc of { AssocLeft -> InfixL3; AssocRight -> InfixR3; AssocNone -> Infix3 }
+  4 -> case assoc of { AssocLeft -> InfixL4; AssocRight -> InfixR4; AssocNone -> Infix4 }
+  5 -> case assoc of { AssocLeft -> InfixL5; AssocRight -> InfixR5; AssocNone -> Infix5 }
+  6 -> case assoc of { AssocLeft -> InfixL6; AssocRight -> InfixR6; AssocNone -> Infix6 }
+  7 -> case assoc of { AssocLeft -> InfixL7; AssocRight -> InfixR7; AssocNone -> Infix7 }
+  8 -> case assoc of { AssocLeft -> InfixL8; AssocRight -> InfixR8; AssocNone -> Infix8 }
+  9 -> case assoc of { AssocLeft -> InfixL9; AssocRight -> InfixR9; AssocNone -> Infix9 }
+  _ -> error $ "Invalid infix precedence level: " ++ show prec
+
+-- Parses a module's code.
+parseCode :: [InfixDef] -> Module String -> Module [TopDeclaration]
+parseCode infixDefs (Module file a b c d content) = Module file a b c d $ topDeclarations tokens
+  where
+  tokens = map (changeInfix . relocate) $ alexScanTokens content
   relocate :: Token -> Token
   relocate (Token t s (Position _ l c)) = Token t s $ Position file l c
+  changeInfix :: Token -> Token
+  changeInfix (Token t s p) = case t of
+    Id -> case lookup s infixDefs of
+      Nothing -> Token t s p
+      Just a  -> Token (infixName a) s p
+    _ -> Token t s p
 
 -- | Remove comments from code.
 uncomment :: FilePath -> String -> String
@@ -90,9 +124,6 @@ uncomment file a = uncomment a
     '\\' : '"' : rest -> "\\\"" ++ ignoreString rest
     a : rest          -> a : ignoreString rest
 
-data Import = Import Path
-data Export = Export Name
-
 -- Extracts imports from a module.
 imports :: String -> (String, [Import])
 imports = filterExtract $ \ a -> case words a of
@@ -105,17 +136,15 @@ exports = filterExtract $ \ a -> case words a of
   ["export", p] -> Just $ Export p
   _ -> Nothing
 
-data Infix = Infix Int String | Infixl Int String | Infixr Int String
-
 -- Extracts the infix declarations from a module.
-infixes :: String -> (String, [Infix])
+infixes :: String -> (String, [InfixDef])
 infixes = filterExtract $ \ a -> case words a of
-  ["infix",  n, a] | elem n $ map show [0 .. 9] -> Just $ Infix  (read n) a
-  ["infixl", n, a] | elem n $ map show [0 .. 9] -> Just $ Infixl (read n) a
-  ["infixr", n, a] | elem n $ map show [0 .. 9] -> Just $ Infixr (read n) a
+  ["infix",  n, a] | elem n $ map show [0 .. 9] -> Just (a, (read n, AssocNone ))
+  ["infixl", n, a] | elem n $ map show [0 .. 9] -> Just (a, (read n, AssocLeft ))
+  ["infixr", n, a] | elem n $ map show [0 .. 9] -> Just (a, (read n, AssocRight))
   _ -> Nothing
 
--- Filters out lines and accumulates data on pattern.
+-- Filters out lines and accumulates data on a pattern.
 filterExtract :: (String -> Maybe a) -> String -> (String, [a])
 filterExtract f a = (unlines m, catMaybes n)
   where

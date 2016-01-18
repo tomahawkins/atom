@@ -44,7 +44,7 @@ TopDeclarations :: { [TopDeclaration] }
 | TopDeclarations TopDeclaration  { $1 ++ [$2] }
 
 TopDeclaration :: { TopDeclaration }
-: "()" { TopDeclaration }
+: "()" { Value }
 
 Identifier :: { String }
 : identifier   { tokenString $1 }

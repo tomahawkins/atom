@@ -2,7 +2,18 @@ module AST
   ( TopDeclaration (..)
   ) where
 
-data TopDeclaration = TopDeclaration deriving Show
+import Common
+
+data TopDeclaration
+  = Datatype  Name [Name] [(Name, [Parameter])]
+  | Typeclass
+  | Value
+  deriving Show
+
+data Parameter
+  = Type     Name
+  | Abstract Name
+  deriving Show
 
 {-
 data TopLevelDeclaration
