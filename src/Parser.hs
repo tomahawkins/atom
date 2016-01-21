@@ -77,10 +77,10 @@ parseCode infixDefs (Module file a b c d content) = Module file a b c d $ topDec
   where
   tokens = map (changeInfix . relocate) $ alexScanTokens content
   relocate :: Token -> Token
-  relocate (Token t s (Position _ l c)) = Token t s $ Position file l c
+  relocate (Token t s (Location _ l c)) = Token t s $ Location file l c
   changeInfix :: Token -> Token
   changeInfix (Token t s p) = case t of
-    Id -> case lookup s infixDefs of
+    Operator -> case lookup s infixDefs of
       Nothing -> Token t s p
       Just a  -> Token (infixName a) s p
     _ -> Token t s p

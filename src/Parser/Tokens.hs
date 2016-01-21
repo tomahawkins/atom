@@ -1,19 +1,23 @@
 module Parser.Tokens
   ( Token     (..)
   , TokenName (..)
-  , Position  (..)
   , tokenString
+  , tokenLocation
+  , tokenLocStr
   ) where
+
+import Common
 
 tokenString :: Token -> String
 tokenString (Token _ s _) = s
 
-data Position = Position String Int Int deriving Eq
+tokenLocation :: Token -> Location
+tokenLocation (Token _ _ l) = l
 
-instance Show Position where
-  show (Position f l c) = f ++ ":" ++ show l ++ ":" ++ show c
+tokenLocStr :: Token -> (Location, String)
+tokenLocStr a = (tokenLocation a, tokenString a)
 
-data Token = Token TokenName String Position deriving (Show, Eq)
+data Token = Token TokenName String Location deriving (Show, Eq)
 
 data TokenName
   = InfixL9 | InfixR9 | Infix9
@@ -28,8 +32,17 @@ data TokenName
   | InfixL0 | InfixR0 | Infix0
 
   | ParenL | ParenR
+  | Equal
+  | ColonColon
+  | Semi
+  | Tic
+  | Pipe
   | Unit
 
+  | KW_datatype
+  | KW_class
+  | KW_instance
+  | KW_value
   | KW_case
   | KW_if
   | KW_else
@@ -37,7 +50,10 @@ data TokenName
   | KW_of
   | KW_where
 
-  | Id
+  | IdUpper
+  | IdLower
+  | Operator
+
   | Unknown
   deriving (Show, Eq)
 

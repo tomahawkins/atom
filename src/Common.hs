@@ -2,6 +2,7 @@ module Common
   ( Name
   , Path
   , split
+  , Location (..)
   ) where
 
 type Name = String
@@ -13,4 +14,9 @@ split a b
   | otherwise = b0 : split a (tail b1)
   where
   (b0, b1) = break (a ==) b
+
+data Location = Location String Int Int deriving Eq
+
+instance Show Location where
+  show (Location f l c) = f ++ ":" ++ show l ++ ":" ++ show c
 
