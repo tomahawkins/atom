@@ -1,61 +1,47 @@
 module AST
   ( TopDeclaration (..)
-  , ValueDeclaration (..)
-  , Parameter (..)
+  , Value (..)
   , Expr (..)
-  , Literal (..)
-  , Locate (..)
   ) where
 
 import Common
-import Parser.Tokens
 
 data TopDeclaration
-  = Datatype  Name [Name] [(Name, [Parameter])]
+  = Value'    Value
+  | Datatype  Location Name [Name] [(Location, Name, [Expr])]
   | Typeclass
-  | Value     ValueDeclaration
   deriving Show
 
-data Parameter
-  = Type     Name
-  | Abstract Name
-  deriving Show
-
-data ValueDeclaration = ValueDeclaration
-  { name      :: Name
-  , arguments :: [(Name, Maybe Expr)]
+data Value = Value
+  { loc       :: Location
+  , name      :: Name
   , contract  :: Maybe Expr
+  , arguments :: [Name]
   , body      :: Expr
   } deriving Show
+
+instance Locate Value where locate = loc
 
 type L = Location
 
 data Expr
-  = Literal  L Literal
-  | VarValue L Name
-  | VarType  L Name
-  | Apply    L Expr Expr
+  = LitUnit   L
+  | VarValue  L Name
+  | VarType   L Name
+  | Apply     L Expr Expr
+  | Lambda    L Name Expr
+  | Where     L Expr [Value]
+  | Intrinsic L Name
   deriving Show
 
-data Literal
-  = LitUnit
-  deriving Show
-
-class    Locate a        where locate :: a -> Location
-instance Locate Location where locate = id
-instance Locate Token    where locate (Token _ _ l) = l
 instance Locate Expr     where
   locate a = case a of
-    Literal   a _ -> a
+    LitUnit   a -> a
     VarValue  a _ -> a
     VarType   a _ -> a
     Apply     a _ _ -> a
+    Lambda    a _ _ -> a
+    Where     a _ _ -> a
+    Intrinsic a _ -> a
     
-
-{-
-data TopLevelDeclaration
-  = TypeClass Name Name [
-  | NamedValue Name [(Name, CtrExpr)] (Maybe CtrExpr) Expr
-data Prototype
--}
 

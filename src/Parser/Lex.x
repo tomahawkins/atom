@@ -17,24 +17,24 @@ import Parser.Tokens
 
 tokens :-
 
-  "class"    { tok KW_class    }
-  "instance" { tok KW_instance }
-  "datatype" { tok KW_datatype }
-  "value"    { tok KW_value    }
-  "case"     { tok KW_case     }
-  "if"       { tok KW_if       }
-  "else"     { tok KW_else     }
-  "do"       { tok KW_do       }
-  "of"       { tok KW_of       }
-  "where"    { tok KW_where    }
-  "()"       { tok Unit        }
-  "("        { tok ParenL      }
-  ")"        { tok ParenR      }
-  "="        { tok Equal       }
-  "::"       { tok ColonColon  }
-  ";"        { tok Semi        }
-  "`"        { tok Tic         }
-  "|"        { tok Pipe        }
+  "class"      { tok KW_class     }
+  "instance"   { tok KW_instance  }
+  "datatype"   { tok KW_datatype  }
+  "case"       { tok KW_case      }
+  "if"         { tok KW_if        }
+  "intrinsic"  { tok KW_intrinsic }
+  "else"       { tok KW_else      }
+  "do"         { tok KW_do        }
+  "of"         { tok KW_of        }
+  "where"      { tok KW_where     }
+  "()"         { tok Unit         }
+  "("          { tok ParenL       }
+  ")"          { tok ParenR       }
+  "="          { tok Equal        }
+  "::"         { tok ColonColon   }
+  ";"          { tok Semi         }
+  "`"          { tok Tic          }
+  "|"          { tok Pipe         }
 
   @idUpper       { tok IdUpper  }
   @idLower       { tok IdLower  }

@@ -15,16 +15,16 @@ import Parser.Tokens
 
 %token
 
-"class"     { Token KW_class    _ _ }
-"instance"  { Token KW_instance _ _ }
-"datatype"  { Token KW_datatype _ _ }
-"value"     { Token KW_value    _ _ }
-"case"      { Token KW_case     _ _ }
-"if"        { Token KW_if       _ _ }
-"else"      { Token KW_else     _ _ }
-"do"        { Token KW_do       _ _ }
-"of"        { Token KW_of       _ _ }
-"where"     { Token KW_where    _ _ }
+"class"      { Token KW_class      _ _ }
+"instance"   { Token KW_instance   _ _ }
+"datatype"   { Token KW_datatype   _ _ }
+"case"       { Token KW_case       _ _ }
+"if"         { Token KW_if         _ _ }
+"else"       { Token KW_else       _ _ }
+"do"         { Token KW_do         _ _ }
+"of"         { Token KW_of         _ _ }
+"where"      { Token KW_where      _ _ }
+"intrinsic"  { Token KW_intrinsic  _ _ }
 
 "infixl9" { Token InfixL9 _ _ }    "infixr9" { Token InfixR9 _ _ }    "infix9" { Token Infix9 _ _ }
 "infixl8" { Token InfixL8 _ _ }    "infixr8" { Token InfixR8 _ _ }    "infix8" { Token Infix8 _ _ }
@@ -37,14 +37,16 @@ import Parser.Tokens
 "infixl1" { Token InfixL1 _ _ }    "infixr1" { Token InfixR1 _ _ }    "infix1" { Token Infix1 _ _ }
 "infixl0" { Token InfixL0 _ _ }    "infixr0" { Token InfixR0 _ _ }    "infix0" { Token Infix0 _ _ }
 
-"()"  { Token Unit        _ _ }
-"("   { Token ParenL      _ _ }
-")"   { Token ParenR      _ _ }
-"::"  { Token ColonColon  _ _ }
-"="   { Token Equal       _ _ }
-";"   { Token Semi        _ _ }
-"`"   { Token Tic         _ _ }
-"|"   { Token Pipe        _ _ }
+"()"  { Token Unit          _ _ }
+"("   { Token ParenL        _ _ }
+")"   { Token ParenR        _ _ }
+"::"  { Token ColonColon    _ _ }
+"="   { Token Equal         _ _ }
+";"   { Token Semi          _ _ }
+"`"   { Token Tic           _ _ }
+"|"   { Token Pipe          _ _ }
+-- "->"  { Token MinusGreater  _ _ }
+-- "\\"  { Token Slash         _ _ }
 
 idLower   { Token IdLower     _ _ }
 idUpper   { Token IdUpper     _ _ }
@@ -57,34 +59,35 @@ TopDeclarations :: { [TopDeclaration] }
 | TopDeclarations TopDeclaration  { $1 ++ [$2] }
 
 TopDeclaration :: { TopDeclaration }
-: ValueDeclaration                               { Value $1 }
---| "datatype" IdUpper Parameters "=" Constructors { Value }
+: Value                                            { Value' $1 }
+| "datatype" IdUpper IdLowers "=" Constructors ";" { Datatype (locate $1) (snd $2) $3 $5 }
 
-ValueDeclaration :: { ValueDeclaration }
-: "value" ValueId Arguments                          "=" Expression  { ValueDeclaration $2 $3 Nothing $5       }
-| "value" ValueId Arguments          "::" Expression "=" Expression  { ValueDeclaration $2 $3 (Just $5) $7            }
-| "value" Argument Operator Argument                 "=" Expression  { ValueDeclaration (snd $3) [$2, $4] Nothing $6 }
-| "value" Argument Operator Argument "::" Expression "=" Expression  { ValueDeclaration (snd $3) [$2, $4] (Just $6) $8      }
+Value :: { Value }
+: ValueId MaybeType               "=" Expression ";" { Value (fst $1) (snd $1) $2 [] $4 }
+| ValueId MaybeType "|" IdLowers_ "=" Expression ";" { Value (fst $1) (snd $1) $2 $4 $6 }
 
-ValueId :: { Name }
-: IdLower            { snd $1 }
-| "(" Operator ")"   { snd $2 }
+Values :: { [Value] }
+: { [] }
+| Values Value { $1 ++ [$2] }
 
-Arguments :: { [(Name, Maybe Expr)] }
-:                     { [] }
-| Arguments Argument  { $1 ++ [$2] }
+ValueId :: { (Location, Name) }
+: IdLower            { $1 }
+| "(" Operator ")"   { $2 }
 
-Argument :: { (Name, Maybe Expr) }
-:     IdLower                        { (snd $1, Nothing) }
-| "(" IdLower "::" Expression ")"    { (snd $2, Just $4) }
+MaybeType :: { Maybe Expr }
+: { Nothing }
+| "::" Expression { Just $2 }
 
-Parameters :: { [Name] }
-:                     { [] }
-| Parameters IdLower  { $1 ++ [snd $2] }
+IdLowers_ :: { [Name] }
+: IdLowers IdLower { $1 ++ [snd $2] }
 
-Constructors  :: { () }
-:                  IdLower Expressions  { () }
-| Constructors "|" IdUpper Expressions  { () }
+IdLowers :: { [Name] }
+:                   { [] }
+| IdLowers IdLower  { $1 ++ [snd $2] }
+
+Constructors  :: { [(Location, Name, [Expr])] }
+:                  IdLower Expressions  {       [(fst $1, snd $1, $2)] }
+| Constructors "|" IdUpper Expressions  { $1 ++ [(fst $3, snd $3, $4)] }
 
 IdLower :: { (Location, Name) }
 : idLower  { tokenLocStr $1 }
@@ -102,6 +105,8 @@ Expressions :: { [Expr] }
 
 Expression :: { Expr }
 : Expr0a { $1 }
+| Expression "where" Values    { Where  (locate $1) $1 $3 }
+--| "\\" IdLowers_ "->" Expression ";"  { Lambda (locate $1) (snd $2) $4 }
 
 Expr0a :: { Expr } : Expr1a "infix0" Expr1a { applyInfix $1 $2 $3 } | Expr0a "infixl0" Expr0b { applyInfix $1 $2 $3 } | Expr0b { $1 }    Expr0b :: { Expr } : Expr1a "infixr0" Expr0b { applyInfix $1 $2 $3 } | Expr1a  { $1 }
 Expr1a :: { Expr } : Expr2a "infix1" Expr2a { applyInfix $1 $2 $3 } | Expr1a "infixl1" Expr1b { applyInfix $1 $2 $3 } | Expr1b { $1 }    Expr1b :: { Expr } : Expr2a "infixr1" Expr1b { applyInfix $1 $2 $3 } | Expr2a  { $1 }
@@ -119,16 +124,14 @@ ExprAp :: { Expr }
 |        ExprPrimary { $1 }
 
 ExprPrimary :: { Expr }
-: IdLower                       { VarValue (fst $1) (snd $1) }
-| IdUpper                       { VarType  (fst $1) (snd $1) }
-| "(" Operator ")"              { VarValue (fst $2) (snd $2) }
---| "(" Operator Expression ")"   { () }
---| "(" Expression Operator ")"   { () }
-| "(" Expression ")"            { $2 }
-| ExprLiteral                   { $1 }
-
-ExprLiteral :: { Expr }
-: "()"     { Literal (locate $1) LitUnit }
+: "(" Expression ")"             { $2 }
+| IdLower                        { VarValue (fst $1) (snd $1) }
+| IdUpper                        { VarType  (fst $1) (snd $1) }
+| "(" Operator ")"               { VarValue (fst $2) (snd $2) }
+| "(" Expression Operator ")"    { Apply    (fst $3) (VarValue (fst $3) (snd $3)) $2 }
+--| "(" Operator Expression ")"    { () }
+| "()"                           { LitUnit $ locate $1 }
+| "intrinsic" IdLower            { Intrinsic (locate $1) (snd $2) }
 
 
 
@@ -140,5 +143,8 @@ parseError a = case a of
 
 applyInfix :: Expr -> Token -> Expr -> Expr
 applyInfix a op b = Apply (locate op) (Apply (locate op) (VarValue (locate op) (tokenString op)) a) b
+
+tokenLocStr :: Token -> (Location, String)
+tokenLocStr a = (locate a, tokenString a)
 }
 

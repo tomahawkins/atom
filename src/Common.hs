@@ -3,6 +3,7 @@ module Common
   , Path
   , split
   , Location (..)
+  , Locate   (..)
   ) where
 
 type Name = String
@@ -19,4 +20,8 @@ data Location = Location String Int Int deriving Eq
 
 instance Show Location where
   show (Location f l c) = f ++ ":" ++ show l ++ ":" ++ show c
+   
+class    Locate a        where locate :: a -> Location
+instance Locate Location where locate = id
+
 

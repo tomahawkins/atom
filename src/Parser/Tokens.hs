@@ -2,8 +2,6 @@ module Parser.Tokens
   ( Token     (..)
   , TokenName (..)
   , tokenString
-  , tokenLocation
-  , tokenLocStr
   ) where
 
 import Common
@@ -11,13 +9,9 @@ import Common
 tokenString :: Token -> String
 tokenString (Token _ s _) = s
 
-tokenLocation :: Token -> Location
-tokenLocation (Token _ _ l) = l
-
-tokenLocStr :: Token -> (Location, String)
-tokenLocStr a = (tokenLocation a, tokenString a)
-
 data Token = Token TokenName String Location deriving (Show, Eq)
+
+instance Locate Token    where locate (Token _ _ l) = l
 
 data TokenName
   = InfixL9 | InfixR9 | Infix9
@@ -42,13 +36,13 @@ data TokenName
   | KW_datatype
   | KW_class
   | KW_instance
-  | KW_value
   | KW_case
   | KW_if
   | KW_else
   | KW_do
   | KW_of
   | KW_where
+  | KW_intrinsic
 
   | IdUpper
   | IdLower
