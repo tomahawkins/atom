@@ -1,7 +1,9 @@
 module AST
   ( TopDeclaration (..)
-  , Value (..)
-  , Expr (..)
+  , Value   (..)
+  , Expr    (..)
+  , Guard   (..)
+  , Pattern (..)
   ) where
 
 import Common
@@ -9,8 +11,14 @@ import Common
 data TopDeclaration
   = Value'    Value
   | Datatype  Location Name [Name] [(Location, Name, [Expr])]
-  | Typeclass
+  | Typeclass Location
   deriving Show
+
+instance Locate TopDeclaration where
+  locate a = case a of
+    Value' a -> locate a
+    Datatype a _ _ _ -> a
+    Typeclass a -> a
 
 data Value = Value
   { loc       :: Location
@@ -32,6 +40,8 @@ data Expr
   | Lambda    L Name Expr
   | Where     L Expr [Value]
   | Intrinsic L Name
+  | If        L Expr Expr Expr
+  | Case      L Expr [(Pattern, Guard)]
   deriving Show
 
 instance Locate Expr     where
@@ -43,5 +53,28 @@ instance Locate Expr     where
     Lambda    a _ _ -> a
     Where     a _ _ -> a
     Intrinsic a _ -> a
+    If        a _ _ _ -> a
+    Case      a _ _ -> a
     
+data Pattern
+  = Wildcard    L
+  | Constructor L Name
+  deriving Show
+
+instance Locate Pattern where
+  locate a = case a of
+    Wildcard a -> a
+    Constructor a _ -> a
+
+data Guard
+  = Unguarded L Expr
+  | Guard     L Expr Expr
+  | Guard'    L Expr Expr Guard
+  deriving Show
+
+instance Locate Guard where
+  locate a = case a of
+    Unguarded a _ -> a
+    Guard     a _ _ -> a
+    Guard'    a _ _ _ -> a
 

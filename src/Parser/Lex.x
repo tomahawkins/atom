@@ -22,6 +22,7 @@ tokens :-
   "datatype"   { tok KW_datatype  }
   "case"       { tok KW_case      }
   "if"         { tok KW_if        }
+  "then"       { tok KW_then      }
   "intrinsic"  { tok KW_intrinsic }
   "else"       { tok KW_else      }
   "do"         { tok KW_do        }
@@ -35,6 +36,9 @@ tokens :-
   ";"          { tok Semi         }
   "`"          { tok Tic          }
   "|"          { tok Pipe         }
+  "\\"         { tok Backslash    }
+  "_"          { tok Underscore   }
+  "->"         { tok MinusGreater }
 
   @idUpper       { tok IdUpper  }
   @idLower       { tok IdLower  }

@@ -31,6 +31,9 @@ data TokenName
   | Semi
   | Tic
   | Pipe
+  | MinusGreater
+  | Backslash
+  | Underscore
   | Unit
 
   | KW_datatype
@@ -38,6 +41,7 @@ data TokenName
   | KW_instance
   | KW_case
   | KW_if
+  | KW_then
   | KW_else
   | KW_do
   | KW_of

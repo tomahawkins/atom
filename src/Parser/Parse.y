@@ -20,6 +20,7 @@ import Parser.Tokens
 "datatype"   { Token KW_datatype   _ _ }
 "case"       { Token KW_case       _ _ }
 "if"         { Token KW_if         _ _ }
+"then"       { Token KW_then       _ _ }
 "else"       { Token KW_else       _ _ }
 "do"         { Token KW_do         _ _ }
 "of"         { Token KW_of         _ _ }
@@ -45,8 +46,9 @@ import Parser.Tokens
 ";"   { Token Semi          _ _ }
 "`"   { Token Tic           _ _ }
 "|"   { Token Pipe          _ _ }
--- "->"  { Token MinusGreater  _ _ }
--- "\\"  { Token Slash         _ _ }
+"->"  { Token MinusGreater  _ _ }
+"\\"  { Token Backslash     _ _ }
+"_"   { Token Underscore    _ _ }
 
 idLower   { Token IdLower     _ _ }
 idUpper   { Token IdUpper     _ _ }
@@ -95,18 +97,42 @@ IdLower :: { (Location, Name) }
 IdUpper :: { (Location, Name) }
 : idUpper  { tokenLocStr $1 }
 
-Operator:: { (Location, Name) }
+Operator :: { (Location, Name) }
 : operator        { tokenLocStr $1 }
 | "`" IdLower "`" { $2 }
+
+Cases :: { [(Pattern, Guard)] }
+:       Case  { [$1] }
+| Cases Case  { $1 ++ [$2] }
+
+Case :: { (Pattern, Guard) }
+: Pattern Guard ";"  { ($1, $2) }
+
+Guard :: { Guard }
+:                "->" Expression        { Unguarded (locate $2) $2 }
+| "|" Expression "->" Expression        { Guard     (locate $2) $2 $4 }
+| "|" Expression "->" Expression Guard  { Guard'    (locate $2) $2 $4 $5 }
+
+Pattern :: { Pattern }
+: "_"      { Wildcard $ locate $1 }
+| IdUpper  { Constructor (fst $1) (snd $1) }
 
 Expressions :: { [Expr] }
 : { [] }
 | Expressions ExprPrimary { $1 ++ [$2] }
 
 Expression :: { Expr }
-: Expr0a { $1 }
-| Expression "where" Values    { Where  (locate $1) $1 $3 }
---| "\\" IdLowers_ "->" Expression ";"  { Lambda (locate $1) (snd $2) $4 }
+: Expr0 { $1 }
+
+Expr0 :: { Expr }
+: "\\" IdLowers_ "->" Expr0  { lambda (locate $1) $2 $4 }
+| "if" Expr0 "then" Expr0 "else" Expr0 { If (locate $1) $2 $4 $6 }
+| "case" Expr0 "of" Cases   { Case (locate $1) $2 $4 }
+| Expr0a { $1 }
+
+Expr1 :: { Expr }
+: Expr1 "where" Values  { Where (locate $1) $1 $3 }
+| Expr0a { $1 }
 
 Expr0a :: { Expr } : Expr1a "infix0" Expr1a { applyInfix $1 $2 $3 } | Expr0a "infixl0" Expr0b { applyInfix $1 $2 $3 } | Expr0b { $1 }    Expr0b :: { Expr } : Expr1a "infixr0" Expr0b { applyInfix $1 $2 $3 } | Expr1a  { $1 }
 Expr1a :: { Expr } : Expr2a "infix1" Expr2a { applyInfix $1 $2 $3 } | Expr1a "infixl1" Expr1b { applyInfix $1 $2 $3 } | Expr1b { $1 }    Expr1b :: { Expr } : Expr2a "infixr1" Expr1b { applyInfix $1 $2 $3 } | Expr2a  { $1 }
@@ -146,5 +172,12 @@ applyInfix a op b = Apply (locate op) (Apply (locate op) (VarValue (locate op) (
 
 tokenLocStr :: Token -> (Location, String)
 tokenLocStr a = (locate a, tokenString a)
+
+lambda :: Location -> [Name] -> Expr -> Expr
+lambda l a b = case a of
+  [] -> error "Error on lambda expression."
+  [a] -> Lambda l a b
+  a : as -> Lambda l a $ lambda l as b
+
 }
 
