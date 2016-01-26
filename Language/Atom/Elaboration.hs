@@ -30,7 +30,6 @@ module Language.Atom.Elaboration
   , allUEs
   ) where
 
-import Control.Applicative (Applicative, pure, (<*>))
 import Control.Monad (ap)
 import Control.Monad.Trans
 import Data.Function (on)

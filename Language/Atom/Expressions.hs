@@ -600,6 +600,10 @@ instance (Expr a, OrdE a, EqE a, IntegralE a, Bits a) => Bits (E a) where
 
   shiftL _ _              = error "shiftL undefined, for left-shifting use .<<."
   shiftR _ _              = error "shiftR undefined, for right-shifting use .>>."
+  bitSizeMaybe            = error "bitSizeMaybe undefined"
+  testBit                 = error "testBit undefinied"
+  bit                     = error "bit undefinied"
+  popCount                = error "popCount undefined"
 
   rotateL _ _             = error "rotateL undefined, for left-rotation use rol"
   rotateR _ _             = error "rotateR undefined, for right-rotation use ror"

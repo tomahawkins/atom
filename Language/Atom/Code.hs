@@ -433,9 +433,9 @@ declState define a' = if isHierarchyEmpty a' then ""
       ++ intercalate ("\n" ++ i ++ ", ") (map showConst c) ++ "\n" ++ i ++ "}"
 
   isHierarchyEmpty h = case h of
-    StateHierarchy n i -> if null i then True else and $ map isHierarchyEmpty i
-    StateVariable n c -> False
-    StateArray n c -> False
+    StateHierarchy _ i -> if null i then True else and $ map isHierarchyEmpty i
+    StateVariable _ _ -> False
+    StateArray _ _ -> False
 
 codeRule :: UeMap -> Config -> Rule -> String
 codeRule mp config rule@(Rule _ _ _ _ _ _ _) =
