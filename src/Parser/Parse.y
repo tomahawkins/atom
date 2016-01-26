@@ -46,7 +46,6 @@ import Parser.Tokens
 ";"   { Token Semi          _ _ }
 "`"   { Token Tic           _ _ }
 "|"   { Token Pipe          _ _ }
-"->"  { Token MinusGreater  _ _ }
 "\\"  { Token Backslash     _ _ }
 "_"   { Token Underscore    _ _ }
 
@@ -109,9 +108,9 @@ Case :: { (Pattern, Guard) }
 : Pattern Guard ";"  { ($1, $2) }
 
 Guard :: { Guard }
-:                "->" Expression        { Unguarded (locate $2) $2 }
-| "|" Expression "->" Expression        { Guard     (locate $2) $2 $4 }
-| "|" Expression "->" Expression Guard  { Guard'    (locate $2) $2 $4 $5 }
+:                "=" Expression        { Unguarded (locate $2) $2 }
+| "|" Expression "=" Expression        { Guard     (locate $2) $2 $4 }
+| "|" Expression "=" Expression Guard  { Guard'    (locate $2) $2 $4 $5 }
 
 Pattern :: { Pattern }
 : "_"      { Wildcard $ locate $1 }
@@ -125,10 +124,11 @@ Expression :: { Expr }
 : Expr0 { $1 }
 
 Expr0 :: { Expr }
-: "\\" IdLowers_ "->" Expr0  { lambda (locate $1) $2 $4 }
+: "\\" IdLowers_ "=" Expr0             { lambda (locate $1) $2 $4 }
 | "if" Expr0 "then" Expr0 "else" Expr0 { If (locate $1) $2 $4 $6 }
-| "case" Expr0 "of" Cases   { Case (locate $1) $2 $4 }
-| Expr0a { $1 }
+| "case" Expr0 "of" Cases              { Case (locate $1) $2 $4 }
+| Expr1 "::" Expr0                     { ApplyContract (locate $2) $1 $3 }
+| Expr0a                               { $1 }
 
 Expr1 :: { Expr }
 : Expr1 "where" Values  { Where (locate $1) $1 $3 }

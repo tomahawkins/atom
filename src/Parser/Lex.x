@@ -36,9 +36,9 @@ tokens :-
   ";"          { tok Semi         }
   "`"          { tok Tic          }
   "|"          { tok Pipe         }
-  "\\"         { tok Backslash    }
+  "\"          { tok Backslash    }
   "_"          { tok Underscore   }
-  "->"         { tok MinusGreater }
+-- "->"         { tok MinusGreater }
 
   @idUpper       { tok IdUpper  }
   @idLower       { tok IdLower  }

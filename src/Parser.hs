@@ -1,4 +1,7 @@
-module Parser (parseProgram) where
+module Parser
+  ( Module (..)
+  , parseProgram
+  ) where
 
 import Control.Monad
 import Data.List
@@ -17,13 +20,12 @@ type InfixDef = (String, (Int, Associativity))
 data Associativity = AssocLeft | AssocRight | AssocNone deriving Show
 
 -- Parse a program.
-parseProgram :: FilePath -> IO ()
+parseProgram :: FilePath -> IO [Module [TopDeclaration]]
 parseProgram main
   | isSuffixOf ".atom" main = do
     modules <- parseModules [] $ split '/' $ take (length main - 5) main
     mapM_ print modules
-    let m = map (parseCode $ infixDefs modules) modules
-    mapM_ print m
+    return $ map (parseCode $ infixDefs modules) modules
   | otherwise = error "Expecting an *.atom file."
 
 -- Parse a single module.
