@@ -19,17 +19,18 @@ idLower   { Token IdLower     _ _ }
 idUpper   { Token IdUpper     _ _ }
 operator  { Token Operator    _ _ }
 
-"class"      { Token KW_class      _ _ }
-"instance"   { Token KW_instance   _ _ }
-"datatype"   { Token KW_datatype   _ _ }
 "case"       { Token KW_case       _ _ }
-"if"         { Token KW_if         _ _ }
-"then"       { Token KW_then       _ _ }
-"else"       { Token KW_else       _ _ }
+"class"      { Token KW_class      _ _ }
+"datatype"   { Token KW_datatype   _ _ }
 "do"         { Token KW_do         _ _ }
-"of"         { Token KW_of         _ _ }
-"where"      { Token KW_where      _ _ }
+"else"       { Token KW_else       _ _ }
+"if"         { Token KW_if         _ _ }
+"instance"   { Token KW_instance   _ _ }
 "intrinsic"  { Token KW_intrinsic  _ _ }
+"let"        { Token KW_let        _ _ }
+"of"         { Token KW_of         _ _ }
+"then"       { Token KW_then       _ _ }
+"where"      { Token KW_where      _ _ }
 
 "()"  { Token Unit          _ _ }
 "("   { Token ParenL        _ _ }
@@ -41,7 +42,6 @@ operator  { Token Operator    _ _ }
 "|"   { Token Pipe          _ _ }
 "\\"  { Token Backslash     _ _ }
 "_"   { Token Underscore    _ _ }
---"->"  { Token InfixR0       "->" _}
 
 "infixl9" { Token InfixL9 _ _ }    "infixr9" { Token InfixR9 _ _ }    "infix9" { Token Infix9 _ _ }
 "infixl8" { Token InfixL8 _ _ }    "infixr8" { Token InfixR8 _ _ }    "infix8" { Token Infix8 _ _ }
@@ -104,7 +104,7 @@ Cases :: { [(Pattern, Guard)] }
 | Cases Case  { $1 ++ [$2] }
 
 Case :: { (Pattern, Guard) }
-: Pattern Guard ";"  { ($1, $2) }
+: Pattern Guard  ";" { ($1, $2) }
 
 Guard :: { Guard }
 :                "=" Expression        { Unguarded (locate $2) $2 }
@@ -115,6 +115,15 @@ Pattern :: { Pattern }
 : "_"      { Wildcard $ locate $1 }
 | IdUpper  { Constructor (fst $1) (snd $1) }
 
+DoItem :: { () }
+: "let" Value                 { () }
+| IdLower "=" Expression ";"  { () }
+| Expression ";"              { () }
+
+DoItems :: { () }
+: DoItem { [$1] }
+| DoItems DoItem { $1 ++ [$2] }
+
 Expressions :: { [Expr] }
 : { [] }
 | Expressions ExprPrimary { $1 ++ [$2] }
@@ -123,10 +132,11 @@ Expression :: { Expr }
 : Expr0 { $1 }
 
 Expr0 :: { Expr }
-: "\\" IdLowers_ "=" Expr0            { lambda (locate $1) $2 $4 }
+: "\\" IdLowers_ "=" Expr0             { lambda (locate $1) $2 $4 }
 | "if" Expr0 "then" Expr0 "else" Expr0 { If (locate $1) $2 $4 $6 }
 | "case" Expr0 "of" Cases              { Case (locate $1) $2 $4 }
 | Expr1 "::" Expr0                     { ApplyContract (locate $2) $1 $3 }
+| "do" DoItems                         { undefined }
 | Expr0a                               { $1 }
 
 Expr1 :: { Expr }
@@ -177,6 +187,5 @@ lambda l a b = case a of
   [] -> error "Error on lambda expression."
   [a] -> Lambda l a b
   a : as -> Lambda l a $ lambda l as b
-
 }
 

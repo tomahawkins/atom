@@ -17,17 +17,19 @@ import Parser.Tokens
 
 tokens :-
 
-  "class"      { tok KW_class     }
-  "instance"   { tok KW_instance  }
-  "datatype"   { tok KW_datatype  }
   "case"       { tok KW_case      }
-  "if"         { tok KW_if        }
-  "then"       { tok KW_then      }
-  "intrinsic"  { tok KW_intrinsic }
-  "else"       { tok KW_else      }
+  "class"      { tok KW_class     }
+  "datatype"   { tok KW_datatype  }
   "do"         { tok KW_do        }
+  "else"       { tok KW_else      }
+  "if"         { tok KW_if        }
+  "instance"   { tok KW_instance  }
+  "intrinsic"  { tok KW_intrinsic }
+  "let"        { tok KW_let       }
   "of"         { tok KW_of        }
+  "then"       { tok KW_then      }
   "where"      { tok KW_where     }
+
   "()"         { tok Unit         }
   "("          { tok ParenL       }
   ")"          { tok ParenR       }

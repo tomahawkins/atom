@@ -36,17 +36,18 @@ data TokenName
   | Underscore
   | Unit
 
-  | KW_datatype
-  | KW_class
-  | KW_instance
   | KW_case
-  | KW_if
-  | KW_then
-  | KW_else
+  | KW_class
+  | KW_datatype
   | KW_do
-  | KW_of
-  | KW_where
+  | KW_else
+  | KW_if
+  | KW_instance
   | KW_intrinsic
+  | KW_let
+  | KW_of
+  | KW_then
+  | KW_where
 
   | IdUpper
   | IdLower
