@@ -15,6 +15,10 @@ import Parser.Tokens
 
 %token
 
+idLower   { Token IdLower     _ _ }
+idUpper   { Token IdUpper     _ _ }
+operator  { Token Operator    _ _ }
+
 "class"      { Token KW_class      _ _ }
 "instance"   { Token KW_instance   _ _ }
 "datatype"   { Token KW_datatype   _ _ }
@@ -27,17 +31,6 @@ import Parser.Tokens
 "where"      { Token KW_where      _ _ }
 "intrinsic"  { Token KW_intrinsic  _ _ }
 
-"infixl9" { Token InfixL9 _ _ }    "infixr9" { Token InfixR9 _ _ }    "infix9" { Token Infix9 _ _ }
-"infixl8" { Token InfixL8 _ _ }    "infixr8" { Token InfixR8 _ _ }    "infix8" { Token Infix8 _ _ }
-"infixl7" { Token InfixL7 _ _ }    "infixr7" { Token InfixR7 _ _ }    "infix7" { Token Infix7 _ _ }
-"infixl6" { Token InfixL6 _ _ }    "infixr6" { Token InfixR6 _ _ }    "infix6" { Token Infix6 _ _ }
-"infixl5" { Token InfixL5 _ _ }    "infixr5" { Token InfixR5 _ _ }    "infix5" { Token Infix5 _ _ }
-"infixl4" { Token InfixL4 _ _ }    "infixr4" { Token InfixR4 _ _ }    "infix4" { Token Infix4 _ _ }
-"infixl3" { Token InfixL3 _ _ }    "infixr3" { Token InfixR3 _ _ }    "infix3" { Token Infix3 _ _ }
-"infixl2" { Token InfixL2 _ _ }    "infixr2" { Token InfixR2 _ _ }    "infix2" { Token Infix2 _ _ }
-"infixl1" { Token InfixL1 _ _ }    "infixr1" { Token InfixR1 _ _ }    "infix1" { Token Infix1 _ _ }
-"infixl0" { Token InfixL0 _ _ }    "infixr0" { Token InfixR0 _ _ }    "infix0" { Token Infix0 _ _ }
-
 "()"  { Token Unit          _ _ }
 "("   { Token ParenL        _ _ }
 ")"   { Token ParenR        _ _ }
@@ -48,10 +41,18 @@ import Parser.Tokens
 "|"   { Token Pipe          _ _ }
 "\\"  { Token Backslash     _ _ }
 "_"   { Token Underscore    _ _ }
+--"->"  { Token InfixR0       "->" _}
 
-idLower   { Token IdLower     _ _ }
-idUpper   { Token IdUpper     _ _ }
-operator  { Token Operator    _ _ }
+"infixl9" { Token InfixL9 _ _ }    "infixr9" { Token InfixR9 _ _ }    "infix9" { Token Infix9 _ _ }
+"infixl8" { Token InfixL8 _ _ }    "infixr8" { Token InfixR8 _ _ }    "infix8" { Token Infix8 _ _ }
+"infixl7" { Token InfixL7 _ _ }    "infixr7" { Token InfixR7 _ _ }    "infix7" { Token Infix7 _ _ }
+"infixl6" { Token InfixL6 _ _ }    "infixr6" { Token InfixR6 _ _ }    "infix6" { Token Infix6 _ _ }
+"infixl5" { Token InfixL5 _ _ }    "infixr5" { Token InfixR5 _ _ }    "infix5" { Token Infix5 _ _ }
+"infixl4" { Token InfixL4 _ _ }    "infixr4" { Token InfixR4 _ _ }    "infix4" { Token Infix4 _ _ }
+"infixl3" { Token InfixL3 _ _ }    "infixr3" { Token InfixR3 _ _ }    "infix3" { Token Infix3 _ _ }
+"infixl2" { Token InfixL2 _ _ }    "infixr2" { Token InfixR2 _ _ }    "infix2" { Token Infix2 _ _ }
+"infixl1" { Token InfixL1 _ _ }    "infixr1" { Token InfixR1 _ _ }    "infix1" { Token Infix1 _ _ }
+"infixl0" { Token InfixL0 _ _ }    "infixr0" { Token InfixR0 _ _ }    "infix0" { Token Infix0 _ _ }
 
 %%
 
@@ -64,8 +65,10 @@ TopDeclaration :: { TopDeclaration }
 | "datatype" IdUpper IdLowers "=" Constructors ";" { Datatype (locate $1) (snd $2) $3 $5 }
 
 Value :: { Value }
-: ValueId MaybeType               "=" Expression ";" { Value (fst $1) (snd $1) $2 [] $4 }
-| ValueId MaybeType "|" IdLowers_ "=" Expression ";" { Value (fst $1) (snd $1) $2 $4 $6 }
+: ValueId                               "=" Expression ";" { Value (fst $1) (snd $1) Nothing   [] $3 }
+| ValueId "::" Expression               "=" Expression ";" { Value (fst $1) (snd $1) (Just $3) [] $5 }
+| ValueId                     IdLowers_ "=" Expression ";" { Value (fst $1) (snd $1) Nothing   $2 $4 }
+| ValueId "::" Expression "|" IdLowers_ "=" Expression ";" { Value (fst $1) (snd $1) (Just $3) $5 $7 }
 
 Values :: { [Value] }
 : { [] }
@@ -74,10 +77,6 @@ Values :: { [Value] }
 ValueId :: { (Location, Name) }
 : IdLower            { $1 }
 | "(" Operator ")"   { $2 }
-
-MaybeType :: { Maybe Expr }
-: { Nothing }
-| "::" Expression { Just $2 }
 
 IdLowers_ :: { [Name] }
 : IdLowers IdLower { $1 ++ [snd $2] }
@@ -124,7 +123,7 @@ Expression :: { Expr }
 : Expr0 { $1 }
 
 Expr0 :: { Expr }
-: "\\" IdLowers_ "=" Expr0             { lambda (locate $1) $2 $4 }
+: "\\" IdLowers_ "=" Expr0            { lambda (locate $1) $2 $4 }
 | "if" Expr0 "then" Expr0 "else" Expr0 { If (locate $1) $2 $4 $6 }
 | "case" Expr0 "of" Cases              { Case (locate $1) $2 $4 }
 | Expr1 "::" Expr0                     { ApplyContract (locate $2) $1 $3 }

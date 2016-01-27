@@ -38,7 +38,7 @@ tokens :-
   "|"          { tok Pipe         }
   "\"          { tok Backslash    }
   "_"          { tok Underscore   }
--- "->"         { tok MinusGreater }
+  "->"         { tok InfixR0 }
 
   @idUpper       { tok IdUpper  }
   @idLower       { tok IdLower  }
