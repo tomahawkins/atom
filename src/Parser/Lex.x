@@ -40,11 +40,10 @@ tokens :-
   "|"          { tok Pipe         }
   "\"          { tok Backslash    }
   "_"          { tok Underscore   }
-  "->"         { tok InfixR0 }
 
   @idUpper       { tok IdUpper  }
   @idLower       { tok IdLower  }
-  @operator      { tok Operator }
+  @operator      { tok InfixL9  }
 
   $white         ;
   .              { tok Unknown }

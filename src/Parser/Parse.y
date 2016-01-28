@@ -17,7 +17,6 @@ import Parser.Tokens
 
 idLower   { Token IdLower     _ _ }
 idUpper   { Token IdUpper     _ _ }
-operator  { Token Operator    _ _ }
 
 "case"       { Token KW_case       _ _ }
 "class"      { Token KW_class      _ _ }
@@ -96,7 +95,16 @@ IdUpper :: { (Location, Name) }
 : idUpper  { tokenLocStr $1 }
 
 Operator :: { (Location, Name) }
-: operator        { tokenLocStr $1 }
+: "infix0" { tokenLocStr $1 } | "infixl0" { tokenLocStr $1 } | "infixr0" { tokenLocStr $1 }
+| "infix1" { tokenLocStr $1 } | "infixl1" { tokenLocStr $1 } | "infixr1" { tokenLocStr $1 }
+| "infix2" { tokenLocStr $1 } | "infixl2" { tokenLocStr $1 } | "infixr2" { tokenLocStr $1 }
+| "infix3" { tokenLocStr $1 } | "infixl3" { tokenLocStr $1 } | "infixr3" { tokenLocStr $1 }
+| "infix4" { tokenLocStr $1 } | "infixl4" { tokenLocStr $1 } | "infixr4" { tokenLocStr $1 }
+| "infix5" { tokenLocStr $1 } | "infixl5" { tokenLocStr $1 } | "infixr5" { tokenLocStr $1 }
+| "infix6" { tokenLocStr $1 } | "infixl6" { tokenLocStr $1 } | "infixr6" { tokenLocStr $1 }
+| "infix7" { tokenLocStr $1 } | "infixl7" { tokenLocStr $1 } | "infixr7" { tokenLocStr $1 }
+| "infix8" { tokenLocStr $1 } | "infixl8" { tokenLocStr $1 } | "infixr8" { tokenLocStr $1 }
+| "infix9" { tokenLocStr $1 } | "infixl9" { tokenLocStr $1 } | "infixr9" { tokenLocStr $1 }
 | "`" IdLower "`" { $2 }
 
 Cases :: { [(Pattern, Guard)] }
@@ -112,15 +120,25 @@ Guard :: { Guard }
 | "|" Expression "=" Expression Guard  { Guard'    (locate $2) $2 $4 $5 }
 
 Pattern :: { Pattern }
+: Pattern0 { $1 }
+
+Pattern0 :: { Pattern }
+: Pattern1 { $1 }
+
+Pattern1 :: { Pattern }
 : "_"      { Wildcard $ locate $1 }
-| IdUpper  { Constructor (fst $1) (snd $1) }
+| IdLower  { Constructor (fst $1) (snd $1) }
+
+Patterns :: { [Pattern] }
+: { [] }
+| Patterns Pattern { $1 ++ [$2] }
 
 DoItem :: { () }
 : "let" Value                 { () }
 | IdLower "=" Expression ";"  { () }
 | Expression ";"              { () }
 
-DoItems :: { () }
+DoItems :: { [()] }
 : DoItem { [$1] }
 | DoItems DoItem { $1 ++ [$2] }
 
@@ -163,7 +181,7 @@ ExprPrimary :: { Expr }
 | IdLower                        { VarValue (fst $1) (snd $1) }
 | IdUpper                        { VarType  (fst $1) (snd $1) }
 | "(" Operator ")"               { VarValue (fst $2) (snd $2) }
-| "(" Expression Operator ")"    { Apply    (fst $3) (VarValue (fst $3) (snd $3)) $2 }
+--| "(" Expression Operator ")"    { Apply    (fst $3) (VarValue (fst $3) (snd $3)) $2 }
 --| "(" Operator Expression ")"    { () }
 | "()"                           { LitUnit $ locate $1 }
 | "intrinsic" IdLower            { Intrinsic (locate $1) (snd $2) }

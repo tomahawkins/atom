@@ -24,7 +24,6 @@ parseProgram :: FilePath -> IO [Module [TopDeclaration]]
 parseProgram main
   | isSuffixOf ".atom" main = do
     modules <- parseModules [] $ split '/' $ take (length main - 5) main
-    mapM_ print modules
     return $ map (parseCode $ infixDefs modules) modules
   | otherwise = error "Expecting an *.atom file."
 
@@ -82,7 +81,7 @@ parseCode infixDefs (Module file a b c d content) = Module file a b c d $ topDec
   relocate (Token t s (Location _ l c)) = Token t s $ Location file l c
   changeInfix :: Token -> Token
   changeInfix (Token t s p) = case t of
-    Operator -> case lookup s infixDefs of
+    InfixL9 -> case lookup s infixDefs of
       Nothing -> Token t s p
       Just a  -> Token (infixName a) s p
     _ -> Token t s p
@@ -94,7 +93,7 @@ uncomment file a = uncomment a
   uncomment a = case a of
     ""               -> ""
     '-' : '-' : rest -> "  " ++ removeEOL rest
-    '{' : '-' : rest -> "  " ++ remove rest
+    '{' : '-' : rest -> "  " ++ remove 1 rest
     '"'       : rest -> '"' : ignoreString rest
     a         : rest -> a   : uncomment rest
 
@@ -104,21 +103,22 @@ uncomment file a = uncomment a
     '\t' : rest -> '\t' : removeEOL rest
     _    : rest -> ' '  : removeEOL rest
 
-  remove a = case a of
+  remove depth a = case a of
     ""               -> error $ "File ended without closing comment (-}): " ++ file
-    '"' : rest       -> removeString rest
-    '\n' : rest      -> '\n' : remove rest
-    '\t' : rest      -> '\t' : remove rest
-    '-' : '}' : rest -> "  " ++ uncomment rest
-    _ : rest         -> " "  ++ remove rest
+    '"' : rest       -> removeString depth rest
+    '\n' : rest      -> '\n' : remove depth rest
+    '\t' : rest      -> '\t' : remove depth rest
+    '-' : '}' : rest -> "  " ++ (if depth == 1 then uncomment else remove $ depth - 1) rest
+    '{' : '-' : rest -> "  " ++ remove (depth + 1) rest
+    _ : rest         -> " "  ++ remove depth rest
 
-  removeString a = case a of
+  removeString depth a = case a of
     ""                -> error $ "File ended without closing string: " ++ file
-    '"' : rest        -> " "  ++ remove       rest
-    '\\' : '"' : rest -> "  " ++ removeString rest
-    '\n' : rest       -> '\n' :  removeString rest
-    '\t' : rest       -> '\t' :  removeString rest
-    _    : rest       -> ' '  :  removeString rest
+    '"' : rest        -> " "  ++ remove       depth rest
+    '\\' : '"' : rest -> "  " ++ removeString depth rest
+    '\n' : rest       -> '\n' :  removeString depth rest
+    '\t' : rest       -> '\t' :  removeString depth rest
+    _    : rest       -> ' '  :  removeString depth rest
 
   ignoreString a = case a of
     ""                -> error $ "File ended without closing string: " ++ file

@@ -10,9 +10,6 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [file] -> do
-      m <- parseProgram file
-      mapM_ print m
-      eval m
+    [file] -> parseProgram file >>= eval
     _ -> putStrLn "usage: atom program.atom"
 

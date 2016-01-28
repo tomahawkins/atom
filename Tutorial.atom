@@ -1,0 +1,28 @@
+-- This is a brief tutorial of Atom's new syntax.
+-- A lot of the syntax is inspired by Haskell.
+
+-- Comments look like this.
+{- And like this. -}
+{- These comments can be {- nested -} . -}
+
+-- Named values have a type and value in one line:
+someBoolean :: Bool = true;
+
+-- The type is optional:
+anotherBoolean = false;
+
+-- If a function has a type signature, the arguments follow the type signature after the pipe separator:
+doSomething :: Int -> Int -> Int | a b = undefined;
+
+-- If a function has no type signature, no pipe separator needed.  Function calls are similar to Haskell's:
+doTheSame a b = doSomething a b;
+
+-- Infix operators should defined associativity and precedence (default is infixl 9):
+infixl 6 +
+
+-- Infix operators use the (op) convention when in variable position:
+(+) :: Int -> Int -> Int | a b = add a b;
+
+-- Lambda expressions.  Note the '=' instead of '->':
+add :: Int -> Int -> Int = \ a b = a + b;
+

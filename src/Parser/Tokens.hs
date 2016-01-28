@@ -31,7 +31,6 @@ data TokenName
   | Semi
   | Tic
   | Pipe
-  | MinusGreater
   | Backslash
   | Underscore
   | Unit
@@ -51,7 +50,6 @@ data TokenName
 
   | IdUpper
   | IdLower
-  | Operator
 
   | Unknown
   deriving (Show, Eq)
