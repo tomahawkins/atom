@@ -60,7 +60,7 @@ syn match hsImport		"\<import\>.*"he=s+6 contains=hsImportMod,hsLineComment,hsBl
 syn match hsImportMod		contained "\<\(as\|qualified\|hiding\)\>"
 syn match hsExport       	"\<export\>"
 syn match hsInfix		"\<\(infix\|infixl\|infixr\)\>"
-syn match hsStructure		"\<\(class\|data\|deriving\|instance\|default\|where\)\>"
+syn match hsStructure		"\<\(class\|datatype\|deriving\|instance\|default\|where\)\>"
 syn match hsTypedef		"\<\(type\|newtype\)\>"
 syn match hsStatement		"\<\(do\|case\|of\|let\|in\)\>"
 syn match hsConditional		"\<\(if\|then\|else\)\>"

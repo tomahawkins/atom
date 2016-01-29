@@ -59,14 +59,18 @@ instance Locate Expr     where
     Case          a _ _ -> a
     
 data Pattern
-  = Wildcard    L
-  | Constructor L Name
+  = Wildcard     L
+  | PatternVar   L Name
+  | PatternApply L Pattern Pattern
+  | As           L Name Pattern
   deriving Show
 
 instance Locate Pattern where
   locate a = case a of
-    Wildcard a -> a
-    Constructor a _ -> a
+    Wildcard     a -> a
+    PatternVar   a _ -> a
+    PatternApply a _ _ -> a
+    As           a _ _ -> a
 
 data Guard
   = Unguarded L Expr

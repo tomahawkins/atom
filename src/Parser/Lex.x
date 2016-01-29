@@ -36,10 +36,11 @@ tokens :-
   "="          { tok Equal        }
   "::"         { tok ColonColon   }
   ";"          { tok Semi         }
-  "`"          { tok Tic          }
+  --"`"          { tok Tic          }
   "|"          { tok Pipe         }
   "\"          { tok Backslash    }
   "_"          { tok Underscore   }
+  "@"          { tok At           }
 
   @idUpper       { tok IdUpper  }
   @idLower       { tok IdLower  }

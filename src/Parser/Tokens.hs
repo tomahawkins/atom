@@ -33,6 +33,7 @@ data TokenName
   | Pipe
   | Backslash
   | Underscore
+  | At
   | Unit
 
   | KW_case

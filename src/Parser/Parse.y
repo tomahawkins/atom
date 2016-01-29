@@ -37,10 +37,11 @@ idUpper   { Token IdUpper     _ _ }
 "::"  { Token ColonColon    _ _ }
 "="   { Token Equal         _ _ }
 ";"   { Token Semi          _ _ }
-"`"   { Token Tic           _ _ }
+--"`"   { Token Tic           _ _ }
 "|"   { Token Pipe          _ _ }
 "\\"  { Token Backslash     _ _ }
 "_"   { Token Underscore    _ _ }
+"@"   { Token At            _ _ }
 
 "infixl9" { Token InfixL9 _ _ }    "infixr9" { Token InfixR9 _ _ }    "infix9" { Token Infix9 _ _ }
 "infixl8" { Token InfixL8 _ _ }    "infixr8" { Token InfixR8 _ _ }    "infix8" { Token Infix8 _ _ }
@@ -70,7 +71,7 @@ Value :: { Value }
 | ValueId "::" Expression "|" IdLowers_ "=" Expression ";" { Value (fst $1) (snd $1) (Just $3) $5 $7 }
 
 Values :: { [Value] }
-: { [] }
+:              { [] }
 | Values Value { $1 ++ [$2] }
 
 ValueId :: { (Location, Name) }
@@ -86,7 +87,7 @@ IdLowers :: { [Name] }
 
 Constructors  :: { [(Location, Name, [Expr])] }
 :                  IdLower Expressions  {       [(fst $1, snd $1, $2)] }
-| Constructors "|" IdUpper Expressions  { $1 ++ [(fst $3, snd $3, $4)] }
+| Constructors "|" IdLower Expressions  { $1 ++ [(fst $3, snd $3, $4)] }
 
 IdLower :: { (Location, Name) }
 : idLower  { tokenLocStr $1 }
@@ -105,7 +106,7 @@ Operator :: { (Location, Name) }
 | "infix7" { tokenLocStr $1 } | "infixl7" { tokenLocStr $1 } | "infixr7" { tokenLocStr $1 }
 | "infix8" { tokenLocStr $1 } | "infixl8" { tokenLocStr $1 } | "infixr8" { tokenLocStr $1 }
 | "infix9" { tokenLocStr $1 } | "infixl9" { tokenLocStr $1 } | "infixr9" { tokenLocStr $1 }
-| "`" IdLower "`" { $2 }
+--| "`" IdLower "`" { $2 }
 
 Cases :: { [(Pattern, Guard)] }
 :       Case  { [$1] }
@@ -123,15 +124,17 @@ Pattern :: { Pattern }
 : Pattern0 { $1 }
 
 Pattern0 :: { Pattern }
-: Pattern1 { $1 }
+: Pattern0 Pattern1 { PatternApply (locate $1) $1 $2 }
+|          Pattern1 { $1 }
 
 Pattern1 :: { Pattern }
-: "_"      { Wildcard $ locate $1 }
-| IdLower  { Constructor (fst $1) (snd $1) }
+: IdLower "@" Pattern1  { As (locate $2) (snd $1) $3 }
+| Pattern2              { $1 }
 
-Patterns :: { [Pattern] }
-: { [] }
-| Patterns Pattern { $1 ++ [$2] }
+Pattern2 :: { Pattern }
+: "_"                { Wildcard $ locate $1 }
+| IdLower            { PatternVar (fst $1) (snd $1) }
+| "(" Pattern ")"    { $2 }
 
 DoItem :: { () }
 : "let" Value                 { () }
@@ -155,7 +158,7 @@ Expr0 :: { Expr }
 | "case" Expr0 "of" Cases              { Case (locate $1) $2 $4 }
 | Expr1 "::" Expr0                     { ApplyContract (locate $2) $1 $3 }
 | "do" DoItems                         { undefined }
-| Expr0a                               { $1 }
+| Expr1                                { $1 }
 
 Expr1 :: { Expr }
 : Expr1 "where" Values  { Where (locate $1) $1 $3 }

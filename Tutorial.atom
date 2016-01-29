@@ -3,7 +3,7 @@
 
 -- Comments look like this.
 {- And like this. -}
-{- These comments can be {- nested -} . -}
+{- Comments can be {- nested -} . -}
 
 -- Named values have a type and value in one line:
 someBoolean :: Bool = true;
@@ -25,4 +25,27 @@ infixl 6 +
 
 -- Lambda expressions.  Note the '=' instead of '->':
 add :: Int -> Int -> Int = \ a b = a + b;
+
+-- Recursive let (where) bindings.
+something :: Int -> Bool | arg = c
+  where
+  a :: Bool = false;
+  b :: Bool = true;
+  c :: Bool = a && b;
+  ;
+
+-- Datatype definitions:
+datatype Something param1 param2 = constructor1 | constructor2 param1 | constructor3 param2 Bool;
+
+-- Case (pattern matching) expressions:
+match :: Something -> SomethingElse | a = case a of
+  contructor1      = ();
+  constructor2 a   = ();
+  c@(constructor3 a b)
+    | guard1       = ()
+    | guard2       = ()
+    | otherwise    = (); 
+  _                = ();
+  ;
+
 
