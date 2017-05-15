@@ -136,7 +136,7 @@ Pattern2 :: { Pattern }
 | IdLower            { PatternVar (fst $1) (snd $1) }
 | "(" Pattern ")"    { $2 }
 
-DoItem :: { () }
+DoItem :: { DoItem }
 : "let" Value                 { () }
 | IdLower "=" Expression ";"  { () }
 | Expression ";"              { () }
@@ -157,7 +157,7 @@ Expr0 :: { Expr }
 | "if" Expr0 "then" Expr0 "else" Expr0 { If (locate $1) $2 $4 $6 }
 | "case" Expr0 "of" Cases              { Case (locate $1) $2 $4 }
 | Expr1 "::" Expr0                     { ApplyContract (locate $2) $1 $3 }
-| "do" DoItems                         { undefined }
+| "do" DoItems                         { Do (locate $1) $2 }
 | Expr1                                { $1 }
 
 Expr1 :: { Expr }

@@ -4,6 +4,7 @@ module AST
   , Expr    (..)
   , Guard   (..)
   , Pattern (..)
+  , DoItem  (..)
   ) where
 
 import Common
@@ -43,6 +44,7 @@ data Expr
   | Intrinsic     L Name
   | If            L Expr Expr Expr
   | Case          L Expr [(Pattern, Guard)]
+  | Do            L [DoItem]
   deriving Show
 
 instance Locate Expr     where
@@ -84,3 +86,14 @@ instance Locate Guard where
     Guard     a _ _ -> a
     Guard'    a _ _ _ -> a
 
+data DoItem
+  = DoExpr L Expr
+  | DoBind L Name Expr
+  | DoLet  L Value
+  deriving Show
+
+instance Locate DoItem where
+  locate a = case a of
+    DoExpr a _ -> a
+    DoBind a _ _ -> a
+    DoLet  a _   -> a

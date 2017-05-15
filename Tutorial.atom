@@ -47,5 +47,14 @@ match :: Something -> SomethingElse | a = case a of
     | otherwise    = (); 
   _                = ();
   ;
+ 
+-- Monadic do blocks.
+doSomethingMonadic :: IO () = do
+  asdf;
+  asdf;
+  asdf = asdf;    -- - = used instead of <-.
+  let asdf :: Int = asdf;
+  asdf;
+  ; 
 
 
